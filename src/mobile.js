@@ -17,6 +17,7 @@ window.GroupBRally = window.GroupBRally || {};
     assists: 'arcade',
     transmission: 'auto',
     steerSens: 1.0,
+    fov: 74,
     quality: 'medium',
     weather: 'auto',
     units: 'kmh',
@@ -63,7 +64,7 @@ window.GroupBRally = window.GroupBRally || {};
     lookAt: [0, 0.5, 0],
     floorSize: 40
   });
-  var engine = new G.StageEngine(gfx.renderer, gfx.reshade, 74);
+  var engine = new G.StageEngine(gfx.renderer, gfx.reshade, settings.fov || 74);
 
   garage.rebuildCar(selectedCarId, selectedTyreId);
 
@@ -165,6 +166,7 @@ window.GroupBRally = window.GroupBRally || {};
     var elAssists = document.getElementById('m-assists');
     var elTrans = document.getElementById('m-trans');
     var elSens = document.getElementById('m-steer-sens');
+    var elFov = document.getElementById('m-fov');
     var elQuality = document.getElementById('m-quality');
     var elWeather = document.getElementById('m-weather');
     var elUnits = document.getElementById('m-units');
@@ -175,11 +177,13 @@ window.GroupBRally = window.GroupBRally || {};
     elAssists.value = settings.assists;
     elTrans.value = settings.transmission;
     elSens.value = settings.steerSens;
+    elFov.value = settings.fov || 74;
     elQuality.value = settings.quality;
     elWeather.value = settings.weather || 'auto';
     elUnits.value = settings.units;
     elVoice.checked = !!settings.voiceEnabled;
     document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
+    document.getElementById('m-val-fov').textContent = settings.fov || 74;
 
     function update() {
       var prevQuality = settings.quality;
@@ -188,11 +192,15 @@ window.GroupBRally = window.GroupBRally || {};
       settings.assists = elAssists.value;
       settings.transmission = elTrans.value;
       settings.steerSens = parseFloat(elSens.value);
+      settings.fov = parseInt(elFov.value, 10);
       settings.quality = elQuality.value;
       settings.weather = elWeather.value;
       settings.units = elUnits.value;
       settings.voiceEnabled = elVoice.checked;
       document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
+      document.getElementById('m-val-fov').textContent = settings.fov;
+      engine.raceCamera.fov = settings.fov;
+      engine.raceCamera.updateProjectionMatrix();
       G.setTextureQuality(settings.quality);
       gfx.renderer.shadowMap.enabled = settings.quality !== 'low';
       if (settings.quality !== prevQuality) {
@@ -203,7 +211,7 @@ window.GroupBRally = window.GroupBRally || {};
       G.saveJSON(STORAGE_SETTINGS, settings);
     }
 
-    [elControlMode, elSteerMode, elAssists, elTrans, elSens, elQuality, elWeather, elUnits, elVoice].forEach(function (el) {
+    [elControlMode, elSteerMode, elAssists, elTrans, elSens, elFov, elQuality, elWeather, elUnits, elVoice].forEach(function (el) {
       el.addEventListener('change', update);
       el.addEventListener('input', update);
     });
