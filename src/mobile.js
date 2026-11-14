@@ -1,8 +1,7 @@
 /**
- * Mobile / iPhone Controller for APEX GROUP B Rally
- * - Multi-touch steering pads, Gas/Brake/Handbrake pedals & Manual shift buttons
- * - Optional iOS Gyroscope Tilt Steering (with permission request)
- * - Adaptive Portrait/Landscape Cockpit FOV so Co-Pilot & 3D Dashboard Map remain visible
+ * Mobile / iPhone UI & Touch/Gyro Controller for APEX GROUP B Rally
+ * Delegates 3D rendering, garage showcase, WebGL disposal, physics substepping,
+ * sky/shadow tracking, and camera simulation to `src/core.js`.
  */
 window.GroupBRally = window.GroupBRally || {};
 
@@ -26,39 +25,12 @@ window.GroupBRally = window.GroupBRally || {};
     sfxVol: 0.85
   };
 
-  function detectIsMobile() {
-    var uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
-    var touchMacIpad = (navigator.maxTouchPoints || 0) > 1 && window.innerWidth <= 1024;
-    return uaMobile || touchMacIpad;
-  }
-
-  function isPhoneControlsActive() {
-    if (settings.controlMode === 'phone') return true;
-    if (settings.controlMode === 'pc') return false;
-    return detectIsMobile();
-  }
-
-  function loadJSON(key, fallback) {
-    try {
-      var raw = localStorage.getItem(key);
-      if (!raw) return Object.assign({}, fallback);
-      return Object.assign({}, fallback, JSON.parse(raw));
-    } catch (e) {
-      return Object.assign({}, fallback);
-    }
-  }
-
-  function saveJSON(key, obj) {
-    try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) {}
-  }
-
-  var settings = loadJSON(STORAGE_SETTINGS, defaultSettings);
-  var records = loadJSON(STORAGE_RECORDS, {});
+  var settings = G.loadJSON(STORAGE_SETTINGS, defaultSettings);
+  var records = G.loadJSON(STORAGE_RECORDS, {});
 
   var selectedTrackId = 'forest';
   var selectedCarId = 'bergmeister_q85';
   var selectedTyreId = 'gravel_soft';
-  var mode = 'MENU';
 
   function getViewportSize() {
     if (window.visualViewport) {
@@ -67,60 +39,10 @@ window.GroupBRally = window.GroupBRally || {};
     return { w: window.innerWidth, h: window.innerHeight };
   }
 
-  // Three.js Renderer
-  G.setTextureQuality(settings.quality);
-  var canvas = document.getElementById('game-canvas');
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  var initVp = getViewportSize();
-  renderer.setSize(initVp.w, initVp.h, false);
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
-  renderer.shadowMap.enabled = settings.quality !== 'low';
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  var reshade = G.ReshadePipeline ? new G.ReshadePipeline(renderer) : null;
-
-  var menuScene = new THREE.Scene();
-  var menuCamera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 100);
-  var garagePivot = new THREE.Group();
-  var garageCarMesh = null;
-  var turntableYaw = 0.65;
-  var dragActive = false;
-  var lastTouchX = 0;
-
-  var raceScene = null;
-  var sunLight = null;
-  var skyMesh = null;
-  var sunOffset = new THREE.Vector3(120, 190, -140);
-  var sunFrustumHalf = 75;
-  var raceCamera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.08, 650);
-  var activeTrack = null;
-  var cockpitState = null;
-  var carPivot = null;
-  var phys = null;
-
-  var stageTimer = 0;
-  var countdownTimer = 0;
-  var lastCountdownBeep = 4;
-  var sector1Time = null;
-  var sector2Time = null;
-  var pacenoteCursor = 0;
-  var activePacenote = null;
-  var sectorToastTimer = 0;
-  var glanceToggle = false;
-  var glanceFactor = 0;
-
-  // Touch & Gyro input state
-  var touchState = { left: false, right: false, gas: false, brake: false, hb: false };
-  var gyroSteer = 0;
-  var input = { throttle: 0, brake: 0, steer: 0, handbrake: false };
-
   function getAdaptiveFov(w, h) {
     var vw = w || getViewportSize().w;
     var vh = h || getViewportSize().h;
     if (vh > vw) {
-      // Preserve comfortable horizontal cockpit FOV in portrait mode
       var aspect = Math.max(0.35, vw / Math.max(1, vh));
       var vFov = 2 * Math.atan(Math.tan(38 * Math.PI / 180) / aspect) * (180 / Math.PI);
       return Math.min(104, Math.max(76, vFov));
@@ -128,70 +50,36 @@ window.GroupBRally = window.GroupBRally || {};
     return 72;
   }
 
-  function formatTime(sec) {
-    if (sec === null || sec === undefined || isNaN(sec)) return '--:--.--';
-    var mins = Math.floor(sec / 60);
-    var rem = sec - mins * 60;
-    var whole = Math.floor(rem);
-    var cs = Math.floor((rem - whole) * 100);
-    return (mins < 10 ? '0' : '') + mins + ':' + (whole < 10 ? '0' : '') + whole + '.' + (cs < 10 ? '0' : '') + cs;
-  }
+  // Core Three.js + Engine instances
+  var initVp = getViewportSize();
+  var canvas = document.getElementById('game-canvas');
+  var gfx = G.createRallyRenderer(canvas, settings, initVp.w, initVp.h, false);
+  var garage = new G.GarageShowcase({
+    fov: 48,
+    width: initVp.w,
+    height: initVp.h,
+    cameraPos: [3.8, 2.0, 5.4],
+    lookAt: [0, 0.5, 0],
+    floorSize: 40
+  });
+  var engine = new G.StageEngine(gfx.renderer, gfx.reshade, 74);
+
+  garage.rebuildCar(selectedCarId, selectedTyreId);
+
+  var dragActive = false;
+  var lastTouchX = 0;
+  var sectorToastTimer = 0;
+  var countdownHideTimer = null;
+  var glanceToggle = false;
+
+  // Touch, Keyboard & Gyro input state
+  var keys = {};
+  var touchState = { left: false, right: false, gas: false, brake: false, hb: false };
+  var gyroSteer = 0;
+  var input = { throttle: 0, brake: 0, steer: 0, handbrake: false };
 
   // =========================================================================
-  // 1. GARAGE SHOWCASE SCENE
-  // =========================================================================
-  function initMenuScene() {
-    menuScene.background = new THREE.Color(0x0c1016);
-    menuScene.fog = new THREE.FogExp2(0x0c1016, 0.045);
-
-    menuCamera.position.set(3.8, 2.0, 5.4);
-    menuCamera.lookAt(0, 0.5, 0);
-
-    menuScene.add(new THREE.AmbientLight(0x94a3b8, 0.45));
-    menuScene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.48));
-    var keySpot = new THREE.SpotLight(0xfff1d6, 2.6, 24, Math.PI / 4, 0.42, 1.0);
-    keySpot.position.set(4.5, 6.2, 4.5);
-    menuScene.add(keySpot);
-
-    var rimSpot = new THREE.SpotLight(0x38bdf8, 1.75, 20, Math.PI / 3.5, 0.45, 1.0);
-    rimSpot.position.set(-5.0, 3.6, -4.0);
-    menuScene.add(rimSpot);
-
-    var floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 40),
-      new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.38, metalness: 0.34 })
-    );
-    floor.rotation.x = -Math.PI / 2;
-    menuScene.add(floor);
-
-    var plinth = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.75, 2.95, 0.14, 40),
-      new THREE.MeshStandardMaterial({ color: 0x222936, roughness: 0.35, metalness: 0.55 })
-    );
-    plinth.position.y = 0.07;
-    garagePivot.add(plinth);
-
-    var ring = new THREE.Mesh(
-      new THREE.TorusGeometry(2.76, 0.025, 8, 56),
-      new THREE.MeshBasicMaterial({ color: 0xe11d48 })
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.145;
-    garagePivot.add(ring);
-
-    menuScene.add(garagePivot);
-    rebuildGarageCar();
-  }
-
-  function rebuildGarageCar() {
-    if (garageCarMesh) garagePivot.remove(garageCarMesh);
-    garageCarMesh = G.createExteriorCar(G.getCar(selectedCarId), G.getTyre(selectedTyreId));
-    garageCarMesh.position.y = 0.14;
-    garagePivot.add(garageCarMesh);
-  }
-
-  // =========================================================================
-  // 2. MOBILE MENU UI
+  // 1. MOBILE MENU UI
   // =========================================================================
   function renderMobileMenu() {
     var trackList = document.getElementById('m-track-list');
@@ -199,14 +87,14 @@ window.GroupBRally = window.GroupBRally || {};
     G.TRACKS.forEach(function (tr) {
       var card = document.createElement('div');
       card.className = 'm-card' + (tr.id === selectedTrackId ? ' selected' : '');
-      var best = records[tr.id] ? formatTime(records[tr.id].time) : '--:--.--';
+      var best = records[tr.id] ? G.formatTime(records[tr.id].time) : '--:--.--';
       card.innerHTML =
         '<div class="m-card-row">' +
           '<span class="m-card-title">' + tr.name + '</span>' +
           '<span class="biome-pill biome-' + tr.biome + '">' + tr.biomeLabel + '</span>' +
         '</div>' +
         '<div class="m-card-sub">' + tr.description + '</div>' +
-        '<div class="m-card-meta"><span>GOLD: ' + formatTime(tr.targetTimes.gold) + '</span><span>BEST: ' + best + '</span></div>';
+        '<div class="m-card-meta"><span>GOLD: ' + G.formatTime(tr.targetTimes.gold) + '</span><span>BEST: ' + best + '</span></div>';
       card.addEventListener('click', function () {
         selectedTrackId = tr.id;
         renderMobileMenu();
@@ -229,7 +117,7 @@ window.GroupBRally = window.GroupBRally || {};
         '<div class="m-card-meta"><span>MASS: ' + c.massKg + ' KG</span><span>BIAS: ' + fPct + '/' + (100 - fPct) + ' F/R</span></div>';
       card.addEventListener('click', function () {
         selectedCarId = c.id;
-        rebuildGarageCar();
+        garage.rebuildCar(selectedCarId, selectedTyreId);
         renderMobileMenu();
       });
       carList.appendChild(card);
@@ -247,7 +135,7 @@ window.GroupBRally = window.GroupBRally || {};
         '<div class="m-card-sub">' + ty.tag + (rec ? ' • <strong style="color:#4ade80;">★ BEST</strong>' : '') + '</div>';
       card.addEventListener('click', function () {
         selectedTyreId = ty.id;
-        rebuildGarageCar();
+        garage.rebuildCar(selectedCarId, selectedTyreId);
         renderMobileMenu();
       });
       tyreList.appendChild(card);
@@ -259,14 +147,15 @@ window.GroupBRally = window.GroupBRally || {};
     document.getElementById('m-car-pill').textContent = car.drivetrain + ' • ' + car.massKg + ' KG';
     document.getElementById('m-sum-track').innerHTML = '<strong>STAGE:</strong> ' + track.name;
     document.getElementById('m-sum-best').innerHTML =
-      '<strong>BEST:</strong> ' + (records[track.id] ? formatTime(records[track.id].time) : '--:--.--') + ' • ' + tyre.name;
+      '<strong>BEST:</strong> ' + (records[track.id] ? G.formatTime(records[track.id].time) : '--:--.--') + ' • ' + tyre.name;
   }
 
   function applyMobileControlVisibility() {
-    var phoneMode = isPhoneControlsActive();
+    var phoneMode = G.isPhoneControlsActive(settings);
     var ctrlLayer = document.querySelector('.m-controls-layer');
     if (ctrlLayer) ctrlLayer.classList.toggle('hidden', !phoneMode);
-    document.getElementById('m-steer-zone').classList.toggle('hidden', !phoneMode || settings.steerMode === 'tilt');
+    var steerGroup = document.getElementById('steer-pad-group');
+    if (steerGroup) steerGroup.style.display = (phoneMode && settings.steerMode === 'buttons') ? 'flex' : 'none';
   }
 
   function bindSettings() {
@@ -301,13 +190,13 @@ window.GroupBRally = window.GroupBRally || {};
       settings.voiceEnabled = elVoice.checked;
       document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
       G.setTextureQuality(settings.quality);
-      renderer.shadowMap.enabled = settings.quality !== 'low';
+      gfx.renderer.shadowMap.enabled = settings.quality !== 'low';
       if (settings.quality !== prevQuality) {
-        rebuildGarageCar();
+        garage.rebuildCar(selectedCarId, selectedTyreId);
       }
       G.Audio.applyVolumes(settings);
       applyMobileControlVisibility();
-      saveJSON(STORAGE_SETTINGS, settings);
+      G.saveJSON(STORAGE_SETTINGS, settings);
     }
 
     [elControlMode, elSteerMode, elAssists, elTrans, elSens, elQuality, elUnits, elVoice].forEach(function (el) {
@@ -318,30 +207,12 @@ window.GroupBRally = window.GroupBRally || {};
   }
 
   // =========================================================================
-  // 3. VISUAL RADIO COMMANDS
+  // 2. VISUAL RADIO HUD & STAGE CALLBACKS
   // =========================================================================
-  function buildTurnSvg(note) {
-    var col = note.urgency === 'danger' ? '#ef4444' : (note.urgency === 'warn' ? '#facc15' : '#38bdf8');
-    if (note.dir === 'CAUTION') {
-      return '<svg viewBox="0 0 64 64" width="36" height="36"><polygon points="32,8 58,54 6,54" fill="none" stroke="' + col + '" stroke-width="5" stroke-linejoin="round"/><text x="32" y="47" text-anchor="middle" fill="' + col + '" font-size="26" font-weight="900">!</text></svg>';
-    }
-    if (note.dir === 'STRAIGHT') {
-      return '<svg viewBox="0 0 64 64" width="36" height="36"><path d="M32 54 V12 M32 12 L20 24 M32 12 L44 24" fill="none" stroke="' + col + '" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    }
-    var flip = note.dir === 'LEFT' ? 'transform="translate(64,0) scale(-1,1)"' : '';
-    var path = note.grade === 'HP'
-      ? 'M20 52 V24 C20 12 44 12 44 24 V44 M44 44 L35 35 M44 44 L53 35'
-      : (note.grade <= 2
-        ? 'M22 54 V30 Q22 18 34 18 H50 M50 18 L40 9 M50 18 L40 27'
-        : 'M24 54 V34 Q24 22 48 14 M48 14 L36 11 M48 14 L43 24');
-    return '<svg viewBox="0 0 64 64" width="36" height="36"><g ' + flip + '><path d="' + path + '" fill="none" stroke="' + col + '" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
-  }
-
-  function displayRadioPacenote(note, playSound) {
-    activePacenote = note;
+  function displayRadioPacenote(note, _nextNote, playSound) {
     var panel = document.getElementById('radio-panel');
     panel.className = 'm-radio urgency-' + note.urgency;
-    document.getElementById('radio-turn-icon').innerHTML = buildTurnSvg(note);
+    document.getElementById('radio-turn-icon').innerHTML = G.buildTurnSvg(note, 36);
     document.getElementById('radio-grade-badge').textContent = note.grade;
     document.getElementById('radio-call-title').textContent = note.title;
     document.getElementById('radio-extra-note').textContent = note.extra || 'ON LINE';
@@ -350,15 +221,81 @@ window.GroupBRally = window.GroupBRally || {};
     st.textContent = note.statusLabel;
     st.className = 'road-status ' + note.statusClass;
 
-    if (cockpitState) {
-      cockpitState.callGestureTimer = 1.4;
-      cockpitState.callGestureDir = note.dir === 'RIGHT' ? 1 : (note.dir === 'LEFT' ? -1 : 0);
+    if (engine.cockpitState) {
+      engine.cockpitState.callGestureTimer = 1.4;
+      engine.cockpitState.callGestureDir = note.dir === 'RIGHT' ? 1 : (note.dir === 'LEFT' ? -1 : 0);
     }
     if (playSound) G.Audio.playRadioCall(note.urgency, note.spoken);
   }
 
+  function showSectorToast(label, splitTime, frac) {
+    var toast = document.getElementById('sector-toast');
+    var ref = records[selectedTrackId] ? records[selectedTrackId].time * frac : G.getTrack(selectedTrackId).targetTimes.gold * frac;
+    var d = splitTime - ref;
+    toast.textContent = label + ' ' + (d <= 0 ? '-' : '+') + Math.abs(d).toFixed(2) + 's';
+    toast.className = 'sector-toast' + (d > 0 ? ' slow' : '');
+    toast.classList.remove('hidden');
+    sectorToastTimer = 3.2;
+  }
+
+  function handleFinish(stageTimer) {
+    var tr = G.getTrack(selectedTrackId);
+    var prev = records[tr.id] ? records[tr.id].time : Infinity;
+    var isPB = stageTimer < prev;
+    if (isPB) {
+      records[tr.id] = { time: stageTimer, car: selectedCarId, tyre: selectedTyreId };
+      G.saveJSON(STORAGE_RECORDS, records);
+    }
+    var medal = document.getElementById('finish-medal-badge');
+    if (stageTimer <= tr.targetTimes.gold) { medal.textContent = '★ GOLD WRC STAGE TIME ★'; medal.className = 'finish-medal gold'; }
+    else if (stageTimer <= tr.targetTimes.silver) { medal.textContent = 'SILVER STAGE TIME'; medal.className = 'finish-medal silver'; }
+    else { medal.textContent = 'BRONZE STAGE FINISH'; medal.className = 'finish-medal bronze'; }
+
+    document.getElementById('finish-stage-title').textContent = tr.name;
+    document.getElementById('finish-total-time').textContent = G.formatTime(stageTimer);
+    document.getElementById('finish-pb-banner').classList.toggle('hidden', !isPB);
+    document.getElementById('fin-s1').textContent = G.formatTime(engine.sector1Time);
+    document.getElementById('fin-s2').textContent = G.formatTime(engine.sector2Time);
+    var uf = settings.units === 'mph' ? 0.621371 : 1;
+    document.getElementById('fin-top-spd').textContent = Math.round(engine.phys.topSpeedKmh * uf) + (settings.units === 'mph' ? ' MPH' : ' KM/H');
+    document.getElementById('fin-drift').textContent = Math.round(engine.phys.maxDriftDeg) + '°';
+    document.getElementById('fin-tyre').textContent = Math.round(engine.phys.tyreHealth * 100) + '%';
+    document.getElementById('fin-off').textContent = String(engine.phys.offTrackPenaltyCount);
+    document.getElementById('finish-modal').classList.remove('hidden');
+  }
+
+  var stageCallbacks = {
+    onPacenote: displayRadioPacenote,
+    onSector: showSectorToast,
+    onFinish: handleFinish,
+    onTimer: function (t, dt) {
+      document.getElementById('hud-timer').textContent = G.formatTime(t);
+      if (sectorToastTimer > 0) {
+        sectorToastTimer -= dt;
+        if (sectorToastTimer <= 0) document.getElementById('sector-toast').classList.add('hidden');
+      }
+    },
+    onCountdown: function (secCeil, isGo) {
+      var l1 = document.getElementById('cd-l1'), l2 = document.getElementById('cd-l2'), l3 = document.getElementById('cd-l3');
+      var txt = document.getElementById('countdown-text');
+      if (!isGo) {
+        txt.textContent = String(Math.max(1, secCeil));
+        l1.className = 'cd-light' + (secCeil <= 3 ? ' red' : '');
+        l2.className = 'cd-light' + (secCeil <= 2 ? ' red' : '');
+        l3.className = 'cd-light' + (secCeil <= 1 ? ' red' : '');
+      } else {
+        txt.textContent = 'GO!';
+        l1.className = 'cd-light green'; l2.className = 'cd-light green'; l3.className = 'cd-light green';
+        if (countdownHideTimer) clearTimeout(countdownHideTimer);
+        countdownHideTimer = setTimeout(function () {
+          document.getElementById('countdown-banner').classList.add('hidden');
+        }, 700);
+      }
+    }
+  };
+
   // =========================================================================
-  // 4. GYROSCOPE & MULTI-TOUCH PEDAL BINDING
+  // 3. GYROSCOPE & MULTI-TOUCH BINDINGS
   // =========================================================================
   function setupGyroIfNeeded() {
     if (settings.steerMode !== 'tilt') return;
@@ -375,212 +312,71 @@ window.GroupBRally = window.GroupBRally || {};
     if (settings.steerMode !== 'tilt') return;
     var landscape = window.innerWidth > window.innerHeight;
     var raw = landscape ? (e.beta || 0) : (e.gamma || 0);
-    // Normalize ~32 deg full lock tilt
     var norm = Math.max(-1, Math.min(1, -raw / 32));
     if (Math.abs(norm) < 0.06) norm = 0;
     gyroSteer = norm;
   }
 
-  function bindTouchPad(el, keyName) {
-    function down(e) {
-      e.preventDefault();
-      touchState[keyName] = true;
-      el.classList.add('pressed');
-      if (el.setPointerCapture && e.pointerId !== undefined) {
-        try { el.setPointerCapture(e.pointerId); } catch (err) {}
-      }
-    }
-    function up(e) {
-      e.preventDefault();
-      touchState[keyName] = false;
-      el.classList.remove('pressed');
-    }
-    el.addEventListener('pointerdown', down);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
-    el.addEventListener('lostpointercapture', up);
-    el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
-    el.addEventListener('touchend', function (e) { e.preventDefault(); }, { passive: false });
-  }
-
-  // Suppress iOS Safari pinch-zoom, double-tap zoom, pull-to-refresh & long-press haptics/menus
   ['gesturestart', 'gesturechange', 'gestureend', 'dblclick', 'contextmenu'].forEach(function (evt) {
     document.addEventListener(evt, function (e) { e.preventDefault(); }, { passive: false });
   });
   var lastTapTime = 0;
   document.addEventListener('touchend', function (e) {
     var now = Date.now();
-    if (now - lastTapTime < 300) {
-      // Block rapid double-tap zoom while still allowing normal button taps
-      if (!e.target.closest('.m-tab-body')) {
-        e.preventDefault();
-      }
+    if (now - lastTapTime < 300 && !e.target.closest('.m-tab-body')) {
+      e.preventDefault();
     }
     lastTapTime = now;
   }, { passive: false });
 
-  bindTouchPad(document.getElementById('pad-left'), 'left');
-  bindTouchPad(document.getElementById('pad-right'), 'right');
-  bindTouchPad(document.getElementById('pad-gas'), 'gas');
-  bindTouchPad(document.getElementById('pad-brake'), 'brake');
-  bindTouchPad(document.getElementById('pad-hb'), 'hb');
+  G.bindTouchPad(document.getElementById('pad-left'), touchState, 'left');
+  G.bindTouchPad(document.getElementById('pad-right'), touchState, 'right');
+  G.bindTouchPad(document.getElementById('pad-gas'), touchState, 'gas');
+  G.bindTouchPad(document.getElementById('pad-brake'), touchState, 'brake');
+  G.bindTouchPad(document.getElementById('pad-hb'), touchState, 'hb');
 
   document.getElementById('pad-shift-up').addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    if (phys && settings.transmission === 'manual') phys.shiftUp();
+    if (engine.phys && settings.transmission === 'manual') engine.phys.shiftUp();
   });
   document.getElementById('pad-shift-down').addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    if (phys && settings.transmission === 'manual') phys.shiftDown();
+    if (engine.phys && settings.transmission === 'manual') engine.phys.shiftDown();
   });
 
+  window.addEventListener('keydown', function (e) { keys[e.code] = true; });
+  window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+
   // =========================================================================
-  // 5. START STAGE, PAUSE & FINISH
+  // 4. STAGE LAUNCH, MENU & VIEWPORT EVENTS
   // =========================================================================
   function startStage() {
-    G.Audio.init();
-    G.Audio.applyVolumes(settings);
+    if (countdownHideTimer) { clearTimeout(countdownHideTimer); countdownHideTimer = null; }
     setupGyroIfNeeded();
-
     var trackDef = G.getTrack(selectedTrackId);
-    var carDef = G.getCar(selectedCarId);
-    var tyreDef = G.getTyre(selectedTyreId);
-    G.Audio.setCarProfile(carDef);
-
-    G.setTextureQuality(settings.quality);
-    var isHigh = settings.quality === 'high';
-    raceScene = new THREE.Scene();
-    raceScene.background = new THREE.Color(trackDef.skyHorizon);
-    raceScene.fog = new THREE.FogExp2(trackDef.fogColor, trackDef.fogDensity);
-
-    skyMesh = G.createSkyDomeMesh
-      ? G.createSkyDomeMesh(trackDef, sunOffset, isHigh)
-      : new THREE.Mesh(
-          new THREE.SphereGeometry(520, 20, 14),
-          new THREE.ShaderMaterial({
-            side: THREE.BackSide,
-            depthWrite: false,
-            uniforms: {
-              topColor: { value: new THREE.Color(trackDef.skyTop) },
-              bottomColor: { value: new THREE.Color(trackDef.skyHorizon) }
-            },
-            vertexShader: 'varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-            fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; varying vec3 vPos; void main() { float h = clamp(normalize(vPos).y * 1.4, 0.0, 1.0); gl_FragColor = vec4(mix(bottomColor, topColor, pow(h, 0.65)), 1.0); }'
-          })
-        );
-    raceScene.add(skyMesh);
-
-    raceScene.add(new THREE.HemisphereLight(trackDef.skyTop, trackDef.ambientColor, isHigh ? 0.92 : 0.8));
-    sunLight = new THREE.DirectionalLight(trackDef.sunColor, isHigh ? trackDef.sunIntensity * 1.15 : trackDef.sunIntensity);
-    sunLight.position.copy(sunOffset);
-    if (settings.quality !== 'low') {
-      sunLight.castShadow = true;
-      var maxTex = (renderer.capabilities && renderer.capabilities.maxTextureSize) ? renderer.capabilities.maxTextureSize : 2048;
-      var smSize = isHigh ? Math.min(4096, maxTex) : 1024;
-      sunLight.shadow.mapSize.set(smSize, smSize);
-      sunLight.shadow.camera.near = 10; sunLight.shadow.camera.far = 480;
-      sunFrustumHalf = isHigh ? 75 : 105;
-      sunLight.shadow.camera.left = -sunFrustumHalf; sunLight.shadow.camera.right = sunFrustumHalf;
-      sunLight.shadow.camera.top = sunFrustumHalf; sunLight.shadow.camera.bottom = -sunFrustumHalf;
-      sunLight.shadow.bias = -0.0004;
-      sunLight.shadow.normalBias = 0.035;
-    }
-    raceScene.add(sunLight);
-    raceScene.add(sunLight.target);
-
-    if (isHigh) {
-      var bounceLight = new THREE.DirectionalLight(trackDef.skyHorizon, trackDef.sunIntensity * 0.28);
-      bounceLight.position.set(-sunOffset.x, sunOffset.y * 0.45, -sunOffset.z);
-      raceScene.add(bounceLight);
-    }
-
-    activeTrack = new G.TrackInstance(trackDef, settings.quality).build();
-    raceScene.add(activeTrack.group);
-
-    carPivot = new THREE.Group();
-    cockpitState = G.createCockpitRig(carDef, tyreDef, activeTrack);
-    carPivot.add(cockpitState.rig);
-    carPivot.add(raceCamera);
-    raceScene.add(carPivot);
-
-    raceCamera.fov = getAdaptiveFov();
-    raceCamera.updateProjectionMatrix();
-
-    phys = new G.RallyPhysics(carDef, tyreDef, activeTrack, settings);
-
-    stageTimer = 0;
-    countdownTimer = 3.2;
-    lastCountdownBeep = 4;
-    sector1Time = null;
-    sector2Time = null;
-    pacenoteCursor = 0;
     sectorToastTimer = 0;
     glanceToggle = false;
     touchState = { left: false, right: false, gas: false, brake: false, hb: false };
 
+    engine.startStage(selectedTrackId, selectedCarId, selectedTyreId, settings, getAdaptiveFov(), stageCallbacks);
+
     document.getElementById('hud-timer').textContent = '00:00.00';
-    document.getElementById('hud-gold-target').textContent = formatTime(trackDef.targetTimes.gold);
+    document.getElementById('hud-gold-target').textContent = G.formatTime(trackDef.targetTimes.gold);
     document.getElementById('sector-toast').classList.add('hidden');
     applyMobileControlVisibility();
     document.getElementById('pad-shift-up').classList.toggle('hidden', settings.transmission !== 'manual');
     document.getElementById('pad-shift-down').classList.toggle('hidden', settings.transmission !== 'manual');
-    document.getElementById('btn-lights').classList.toggle('active', cockpitState.lightsOn);
-
-    if (activeTrack.pacenotes.length > 0) {
-      displayRadioPacenote(activeTrack.pacenotes[0], false);
-      pacenoteCursor = 1;
-    }
+    document.getElementById('btn-lights').classList.toggle('active', engine.cockpitState.lightsOn);
 
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('pause-modal').classList.add('hidden');
     document.getElementById('finish-modal').classList.add('hidden');
     document.getElementById('race-overlay').classList.remove('hidden');
     document.getElementById('countdown-banner').classList.remove('hidden');
-
-    mode = 'COUNTDOWN';
-  }
-
-  function showSectorToast(label, splitTime, frac) {
-    var toast = document.getElementById('sector-toast');
-    var ref = records[selectedTrackId] ? records[selectedTrackId].time * frac : G.getTrack(selectedTrackId).targetTimes.gold * frac;
-    var d = splitTime - ref;
-    toast.textContent = label + ' ' + (d <= 0 ? '-' : '+') + Math.abs(d).toFixed(2) + 's';
-    toast.className = 'sector-toast' + (d > 0 ? ' slow' : '');
-    toast.classList.remove('hidden');
-    sectorToastTimer = 3.2;
-  }
-
-  function finishStage() {
-    mode = 'FINISHED';
-    G.Audio.setPaused(true);
-    var tr = G.getTrack(selectedTrackId);
-    var prev = records[tr.id] ? records[tr.id].time : Infinity;
-    var isPB = stageTimer < prev;
-    if (isPB) {
-      records[tr.id] = { time: stageTimer, car: selectedCarId, tyre: selectedTyreId };
-      saveJSON(STORAGE_RECORDS, records);
-    }
-    var medal = document.getElementById('finish-medal-badge');
-    if (stageTimer <= tr.targetTimes.gold) { medal.textContent = '★ GOLD WRC STAGE TIME ★'; medal.className = 'finish-medal gold'; }
-    else if (stageTimer <= tr.targetTimes.silver) { medal.textContent = 'SILVER STAGE TIME'; medal.className = 'finish-medal silver'; }
-    else { medal.textContent = 'BRONZE STAGE FINISH'; medal.className = 'finish-medal bronze'; }
-
-    document.getElementById('finish-stage-title').textContent = tr.name;
-    document.getElementById('finish-total-time').textContent = formatTime(stageTimer);
-    document.getElementById('finish-pb-banner').classList.toggle('hidden', !isPB);
-    document.getElementById('fin-s1').textContent = formatTime(sector1Time);
-    document.getElementById('fin-s2').textContent = formatTime(sector2Time);
-    var uf = settings.units === 'mph' ? 0.621371 : 1;
-    document.getElementById('fin-top-spd').textContent = Math.round(phys.topSpeedKmh * uf) + (settings.units === 'mph' ? ' MPH' : ' KM/H');
-    document.getElementById('fin-drift').textContent = Math.round(phys.maxDriftDeg) + '°';
-    document.getElementById('fin-tyre').textContent = Math.round(phys.tyreHealth * 100) + '%';
-    document.getElementById('fin-off').textContent = String(phys.offTrackPenaltyCount);
-    document.getElementById('finish-modal').classList.remove('hidden');
   }
 
   function returnToMenu() {
-    mode = 'MENU';
-    G.Audio.setPaused(true);
+    engine.returnToMenu();
     document.getElementById('race-overlay').classList.add('hidden');
     document.getElementById('pause-modal').classList.add('hidden');
     document.getElementById('finish-modal').classList.add('hidden');
@@ -588,7 +384,6 @@ window.GroupBRally = window.GroupBRally || {};
     renderMobileMenu();
   }
 
-  // UI Event Listeners
   document.querySelectorAll('.m-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
       document.querySelectorAll('.m-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -601,8 +396,8 @@ window.GroupBRally = window.GroupBRally || {};
   var dragArea = document.getElementById('m-showcase-drag');
   dragArea.addEventListener('pointerdown', function (e) { dragActive = true; lastTouchX = e.clientX; });
   window.addEventListener('pointermove', function (e) {
-    if (dragActive && mode === 'MENU') {
-      turntableYaw += (e.clientX - lastTouchX) * 0.012;
+    if (dragActive && engine.mode === 'MENU') {
+      garage.turntableYaw += (e.clientX - lastTouchX) * 0.012;
       lastTouchX = e.clientX;
     }
   });
@@ -610,16 +405,15 @@ window.GroupBRally = window.GroupBRally || {};
 
   document.getElementById('m-btn-start').addEventListener('click', startStage);
   document.getElementById('btn-pause').addEventListener('click', function () {
-    if (mode === 'RACING' || mode === 'COUNTDOWN') {
-      mode = 'PAUSED';
-      G.Audio.setPaused(true);
+    if (engine.togglePause() === true) {
       document.getElementById('pause-stage-info').textContent = G.getTrack(selectedTrackId).name;
       document.getElementById('pause-modal').classList.remove('hidden');
     }
   });
   document.getElementById('btn-resume').addEventListener('click', function () {
-    mode = countdownTimer > 0 ? 'COUNTDOWN' : 'RACING';
-    document.getElementById('pause-modal').classList.add('hidden');
+    if (engine.togglePause() === false) {
+      document.getElementById('pause-modal').classList.add('hidden');
+    }
   });
   document.getElementById('btn-restart').addEventListener('click', startStage);
   document.getElementById('btn-quit-menu').addEventListener('click', returnToMenu);
@@ -636,97 +430,53 @@ window.GroupBRally = window.GroupBRally || {};
     this.classList.toggle('active', glanceToggle);
   });
   document.getElementById('btn-wipers').addEventListener('click', function () {
-    if (cockpitState) {
-      cockpitState.wiperContinuous = !cockpitState.wiperContinuous;
-      this.classList.toggle('active', cockpitState.wiperContinuous);
-    }
+    this.classList.toggle('active', engine.toggleWipers());
   });
   document.getElementById('btn-lights').addEventListener('click', function () {
-    if (cockpitState) {
-      cockpitState.lightsOn = !cockpitState.lightsOn;
-      cockpitState.headlight.intensity = cockpitState.lightsOn ? 1.8 : 0.0;
-      this.classList.toggle('active', cockpitState.lightsOn);
-    }
+    this.classList.toggle('active', engine.toggleLights());
   });
   document.getElementById('btn-recover').addEventListener('click', function () {
-    if (phys && mode === 'RACING') phys.recoverToTrack();
+    if (engine.phys && engine.mode === 'RACING') engine.phys.recoverToTrack();
   });
 
   function updateViewport() {
     var vp = getViewportSize();
     var w = vp.w, h = vp.h;
-    renderer.setSize(w, h, false);
+    gfx.renderer.setSize(w, h, false);
     var isLandscape = w > h && h <= 580;
-    menuCamera.aspect = w / h;
-    menuCamera.fov = isLandscape ? 42 : 48;
-    menuCamera.updateProjectionMatrix();
+    garage.camera.fov = isLandscape ? 42 : 48;
+    garage.resize(w, h);
     if (isLandscape) {
-      menuCamera.position.set(4.5, 2.0, 5.8);
-      menuCamera.lookAt(1.5, 0.72, 0); // shifts 3D car cleanly into the left showcase half
+      garage.camera.position.set(4.5, 2.0, 5.8);
+      garage.camera.lookAt(1.5, 0.72, 0);
     } else {
-      menuCamera.position.set(3.8, 2.0, 5.4);
-      menuCamera.lookAt(0, 0.5, 0);
+      garage.camera.position.set(3.8, 2.0, 5.4);
+      garage.camera.lookAt(0, 0.5, 0);
     }
-    raceCamera.aspect = w / h;
-    raceCamera.fov = getAdaptiveFov(w, h);
-    raceCamera.updateProjectionMatrix();
+    engine.resize(w, h, getAdaptiveFov(w, h));
   }
 
   updateViewport();
   window.addEventListener('resize', updateViewport);
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', updateViewport);
-  }
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', updateViewport);
   window.addEventListener('orientationchange', function () {
     setTimeout(updateViewport, 150);
     setTimeout(updateViewport, 380);
   });
 
   // =========================================================================
-  // 6. MAIN LOOP
+  // 5. ANIMATION LOOP
   // =========================================================================
   var lastTime = performance.now();
-  var physAcc = 0;
-  var FIXED_DT = 1 / 120;
-
-  // Keyboard support (active in PC mode or when testing on desktop)
-  var keys = {};
-  window.addEventListener('keydown', function (e) {
-    if (keys[e.code]) return;
-    keys[e.code] = true;
-    if (e.code === 'Escape' && (mode === 'RACING' || mode === 'COUNTDOWN')) {
-      mode = 'PAUSED';
-      G.Audio.setPaused(true);
-      document.getElementById('pause-stage-info').textContent = G.getTrack(selectedTrackId).name;
-      document.getElementById('pause-modal').classList.remove('hidden');
-    } else if (mode === 'RACING' || mode === 'COUNTDOWN') {
-      if (e.code === 'KeyE' && settings.transmission === 'manual' && phys) phys.shiftUp();
-      else if (e.code === 'KeyQ' && settings.transmission === 'manual' && phys) phys.shiftDown();
-      else if (e.code === 'KeyV' && cockpitState) cockpitState.wiperContinuous = !cockpitState.wiperContinuous;
-      else if (e.code === 'KeyL' && cockpitState) {
-        cockpitState.lightsOn = !cockpitState.lightsOn;
-        cockpitState.headlight.intensity = cockpitState.lightsOn ? 1.8 : 0.0;
-      } else if (e.code === 'KeyR' && phys && mode === 'RACING') phys.recoverToTrack();
-    }
-  });
-  window.addEventListener('keyup', function (e) { keys[e.code] = false; });
 
   function tick(now) {
     requestAnimationFrame(tick);
     var dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
 
-    if (mode === 'MENU') {
-      if (!dragActive) turntableYaw += dt * 0.35;
-      garagePivot.rotation.y = turntableYaw;
-      if (reshade) reshade.render(menuScene, menuCamera, settings.quality === 'high');
-      else renderer.render(menuScene, menuCamera);
-      return;
-    }
-
-    if (mode === 'PAUSED' || mode === 'FINISHED') {
-      if (reshade) reshade.render(raceScene, raceCamera, settings.quality === 'high');
-      else renderer.render(raceScene, raceCamera);
+    if (engine.mode === 'MENU') {
+      garage.update(dt, dragActive);
+      engine.renderScene(garage.scene, garage.camera, settings.quality);
       return;
     }
 
@@ -734,102 +484,14 @@ window.GroupBRally = window.GroupBRally || {};
     input.brake = (touchState.brake || keys.KeyS || keys.ArrowDown) ? 1 : 0;
     input.handbrake = !!(touchState.hb || keys.Space);
     var keySteer = ((keys.KeyA || keys.ArrowLeft) ? 1 : 0) - ((keys.KeyD || keys.ArrowRight) ? 1 : 0);
-    input.steer = settings.steerMode === 'tilt' && isPhoneControlsActive()
+    input.steer = settings.steerMode === 'tilt' && G.isPhoneControlsActive(settings)
       ? gyroSteer
       : ((touchState.left ? 1 : 0) - (touchState.right ? 1 : 0) + keySteer);
     input.steer = Math.max(-1, Math.min(1, input.steer));
 
-    if (mode === 'COUNTDOWN') {
-      countdownTimer -= dt;
-      var secCeil = Math.ceil(countdownTimer);
-      var l1 = document.getElementById('cd-l1'), l2 = document.getElementById('cd-l2'), l3 = document.getElementById('cd-l3');
-      var txt = document.getElementById('countdown-text');
-      if (countdownTimer > 0) {
-        txt.textContent = String(Math.max(1, secCeil));
-        l1.className = 'cd-light' + (secCeil <= 3 ? ' red' : '');
-        l2.className = 'cd-light' + (secCeil <= 2 ? ' red' : '');
-        l3.className = 'cd-light' + (secCeil <= 1 ? ' red' : '');
-        if (secCeil < lastCountdownBeep && secCeil >= 1) { lastCountdownBeep = secCeil; G.Audio.playCountdownBeep(false); }
-      } else {
-        mode = 'RACING';
-        txt.textContent = 'GO!';
-        l1.className = 'cd-light green'; l2.className = 'cd-light green'; l3.className = 'cd-light green';
-        G.Audio.playCountdownBeep(true);
-        setTimeout(function () { document.getElementById('countdown-banner').classList.add('hidden'); }, 700);
-      }
-    }
-
-    physAcc += dt;
-    while (physAcc >= FIXED_DT) {
-      phys.step(input, FIXED_DT, mode === 'RACING');
-      physAcc -= FIXED_DT;
-    }
-
-    if (mode === 'RACING') {
-      stageTimer += dt;
-      document.getElementById('hud-timer').textContent = formatTime(stageTimer);
-      if (sector1Time === null && phys.trackDist >= activeTrack.totalLength * 0.33) {
-        sector1Time = stageTimer; showSectorToast('S1', sector1Time, 0.33);
-      }
-      if (sector2Time === null && phys.trackDist >= activeTrack.totalLength * 0.66) {
-        sector2Time = stageTimer; showSectorToast('S2', sector2Time, 0.66);
-      }
-      if (sectorToastTimer > 0) {
-        sectorToastTimer -= dt;
-        if (sectorToastTimer <= 0) document.getElementById('sector-toast').classList.add('hidden');
-      }
-      while (pacenoteCursor < activeTrack.pacenotes.length && phys.trackDist >= activeTrack.pacenotes[pacenoteCursor].triggerDist) {
-        displayRadioPacenote(activeTrack.pacenotes[pacenoteCursor], true);
-        pacenoteCursor++;
-      }
-      if (phys.trackDist >= activeTrack.finishDist) finishStage();
-    }
-
-    carPivot.position.copy(phys.pos);
-    carPivot.rotation.set(0, 0, 0);
-    carPivot.rotateY(phys.yaw);
-    carPivot.rotateX(phys.pitch);
-    carPivot.rotateZ(phys.roll);
-
-    glanceFactor += ((glanceToggle ? 1 : 0) - glanceFactor) * Math.min(1, dt * 8);
-    var headSwayX = Math.max(-0.04, Math.min(0.04, -phys.latG * 0.022));
-    var headJoltY = Math.max(-0.03, Math.min(0.03, -phys.vertVel * 0.007));
-
-    raceCamera.position.set(-0.24 + headSwayX + glanceFactor * 0.08, 1.15 + headJoltY, 0.17);
-    raceCamera.rotation.order = 'YXZ';
-    raceCamera.rotation.y = -0.09 - glanceFactor * 0.36;
-    raceCamera.rotation.x = -0.075 - glanceFactor * 0.04;
-    raceCamera.rotation.z = -phys.latG * 0.012;
-
-    G.updateCockpitRig(cockpitState, phys, activePacenote, settings, dt, now / 1000);
-    activeTrack.updateEffects(phys.pos, dt);
-    if (skyMesh) {
-      skyMesh.position.set(phys.pos.x, phys.pos.y * 0.2, phys.pos.z);
-    }
-    if (sunLight && sunLight.castShadow) {
-      var texel = (sunFrustumHalf * 2) / (sunLight.shadow.mapSize.width || 2048);
-      var sx = Math.round(phys.pos.x / texel) * texel;
-      var sz = Math.round(phys.pos.z / texel) * texel;
-      sunLight.target.position.set(sx, phys.pos.y, sz);
-      sunLight.position.set(sx + sunOffset.x, phys.pos.y + sunOffset.y, sz + sunOffset.z);
-      sunLight.target.updateMatrixWorld();
-    }
-    G.Audio.update({
-      rpm: phys.rpm,
-      redline: phys.car.redlineRpm,
-      throttle: phys.throttle,
-      boost: phys.boost,
-      speedKmh: phys.speedKmh,
-      slipIntensity: phys.slipIntensity,
-      surfaceId: phys.surfaceId,
-      airborne: phys.airborne
-    }, dt);
-
-    if (reshade) reshade.render(raceScene, raceCamera, settings.quality === 'high');
-    else renderer.render(raceScene, raceCamera);
+    engine.stepFrame(dt, now, input, glanceToggle ? 1.0 : 0.0, getAdaptiveFov(), settings, stageCallbacks);
   }
 
-  initMenuScene();
   renderMobileMenu();
   bindSettings();
   requestAnimationFrame(tick);
