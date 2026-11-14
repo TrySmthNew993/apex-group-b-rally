@@ -14,10 +14,11 @@ window.GroupBRally = window.GroupBRally || {};
    */
   G.createExteriorCar = function (carDef, tyreDef) {
     var root = new THREE.Group();
+    var isHigh = G.textureQuality === 'high';
     var bodyMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(carDef.bodyColor),
-      roughness: 0.28,
-      metalness: 0.2
+      roughness: isHigh ? 0.22 : 0.28,
+      metalness: isHigh ? 0.35 : 0.2
     });
     var trimMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.65, metalness: 0.2 });
     var accent1Mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentPrimary), roughness: 0.35 });
@@ -54,10 +55,11 @@ window.GroupBRally = window.GroupBRally || {};
 
     // Hood / Bonnet with livery texture
     var hoodTex = G.createHoodLiveryTexture(carDef);
-    var hoodMat = new THREE.MeshStandardMaterial({ map: hoodTex, roughness: 0.3 });
+    var hoodMat = new THREE.MeshStandardMaterial({ map: hoodTex, roughness: isHigh ? 0.24 : 0.3, metalness: isHigh ? 0.24 : 0.1 });
     var hood = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.08, 1.35), hoodMat);
     hood.position.set(0, 0.81, -1.22);
     hood.rotation.x = 0.05;
+    hood.castShadow = true;
     root.add(hood);
 
     // Cabin greenhouse
@@ -170,21 +172,30 @@ window.GroupBRally = window.GroupBRally || {};
    */
   G.createCockpitRig = function (carDef, tyreDef, trackInstance) {
     var rig = new THREE.Group();
+    var isHigh = G.textureQuality === 'high';
 
     var dashMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.dashColor), roughness: 0.92 });
-    var cageMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.cageColor), roughness: 0.45, metalness: 0.4 });
+    var cageMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.cageColor), roughness: isHigh ? 0.36 : 0.45, metalness: isHigh ? 0.52 : 0.4 });
     var padMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.95 });
     var metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.35, metalness: 0.75 });
-    var bodyMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.bodyColor), roughness: 0.3 });
+    var bodyMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.bodyColor), roughness: isHigh ? 0.22 : 0.3, metalness: isHigh ? 0.32 : 0.1 });
+
+    if (isHigh) {
+      // Subtle cabin sky/dash bounce fill so rollcage & wheel catch rim highlights cleanly
+      var cabinBounce = new THREE.PointLight(0xdbeafe, 0.32, 3.2);
+      cabinBounce.position.set(-0.08, 1.15, -0.45);
+      rig.add(cabinBounce);
+    }
 
     // =========================================================================
     // 1. EXTERIOR HOOD / BONNET VISIBLE THROUGH WINDSHIELD
     // =========================================================================
     var hoodTex = G.createHoodLiveryTexture(carDef);
-    var hoodMat = new THREE.MeshStandardMaterial({ map: hoodTex, roughness: 0.32, metalness: 0.15 });
+    var hoodMat = new THREE.MeshStandardMaterial({ map: hoodTex, roughness: isHigh ? 0.24 : 0.32, metalness: isHigh ? 0.25 : 0.15 });
     var hoodMesh = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.08, 1.28), hoodMat);
     hoodMesh.position.set(0, 0.79, -1.52);
     hoodMesh.rotation.x = 0.045;
+    hoodMesh.receiveShadow = isHigh;
     rig.add(hoodMesh);
 
     // Sculpted hood details per car model
@@ -339,6 +350,7 @@ window.GroupBRally = window.GroupBRally || {};
     var gaugeCtx = gaugeCanvas.getContext('2d');
     var gaugeTex = new THREE.CanvasTexture(gaugeCanvas);
     gaugeTex.encoding = THREE.sRGBEncoding;
+    gaugeTex.anisotropy = isHigh ? 8 : 2;
 
     var gaugePod = new THREE.Group();
     gaugePod.position.set(-0.26, 0.885, -0.75);
@@ -443,6 +455,7 @@ window.GroupBRally = window.GroupBRally || {};
     var mapCtx = mapCanvas.getContext('2d');
     var mapTex = new THREE.CanvasTexture(mapCanvas);
     mapTex.encoding = THREE.sRGBEncoding;
+    mapTex.anisotropy = isHigh ? 8 : 2;
 
     var mapScreenMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(0.258, 0.172),
@@ -578,6 +591,7 @@ window.GroupBRally = window.GroupBRally || {};
     nCtx.fillText('SLIPPERY!', 142, 80);
     var notesTex = new THREE.CanvasTexture(notesCanvas);
     notesTex.encoding = THREE.sRGBEncoding;
+    notesTex.anisotropy = isHigh ? 8 : 2;
 
     var binder = new THREE.Mesh(
       new THREE.BoxGeometry(0.24, 0.014, 0.17),

@@ -58,6 +58,7 @@ window.GroupBRally = window.GroupBRally || {};
   var mode = 'MENU';
 
   // Three.js core objects
+  G.setTextureQuality(settings.quality);
   var canvas = document.getElementById('game-canvas');
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -67,6 +68,7 @@ window.GroupBRally = window.GroupBRally || {};
   renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = settings.quality !== 'low';
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  var reshade = G.ReshadePipeline ? new G.ReshadePipeline(renderer) : null;
 
   var menuScene = new THREE.Scene();
   var menuCamera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -83,6 +85,10 @@ window.GroupBRally = window.GroupBRally || {};
   var cockpitState = null;
   var carPivot = null;
   var phys = null;
+  var sunLight = null;
+  var skyMesh = null;
+  var sunOffset = new THREE.Vector3(120, 190, -140);
+  var sunFrustumHalf = 75;
 
   var stageTimer = 0;
   var countdownTimer = 0;
@@ -135,27 +141,34 @@ window.GroupBRally = window.GroupBRally || {};
     menuCamera.position.set(4.1, 2.05, 5.1);
     menuCamera.lookAt(0, 0.72, 0);
 
-    var amb = new THREE.AmbientLight(0x94a3b8, 0.55);
+    var amb = new THREE.AmbientLight(0x94a3b8, 0.42);
     menuScene.add(amb);
+    var garageHemi = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.48);
+    menuScene.add(garageHemi);
 
-    var keySpot = new THREE.SpotLight(0xfff1d6, 2.4, 24, Math.PI / 4, 0.45, 1.0);
+    var keySpot = new THREE.SpotLight(0xfff1d6, 2.75, 26, Math.PI / 4, 0.42, 1.0);
     keySpot.position.set(4.5, 6.2, 4.5);
     keySpot.castShadow = true;
-    keySpot.shadow.mapSize.set(1024, 1024);
+    keySpot.shadow.mapSize.set(2048, 2048);
+    keySpot.shadow.bias = -0.0005;
     menuScene.add(keySpot);
 
-    var rimSpot = new THREE.SpotLight(0x38bdf8, 1.5, 20, Math.PI / 3.5, 0.5, 1.0);
+    var rimSpot = new THREE.SpotLight(0x38bdf8, 1.85, 22, Math.PI / 3.5, 0.45, 1.0);
     rimSpot.position.set(-5.0, 3.6, -4.0);
     menuScene.add(rimSpot);
 
-    var redAccent = new THREE.PointLight(0xe11d48, 0.9, 12);
+    var overheadSpot = new THREE.SpotLight(0xe2e8f0, 1.25, 20, Math.PI / 3.2, 0.6, 1.0);
+    overheadSpot.position.set(0, 7.2, 1.0);
+    menuScene.add(overheadSpot);
+
+    var redAccent = new THREE.PointLight(0xe11d48, 1.15, 12);
     redAccent.position.set(-3.2, 1.2, 3.2);
     menuScene.add(redAccent);
 
     // Garage floor & rotating plinth
     var floor = new THREE.Mesh(
       new THREE.PlaneGeometry(45, 45),
-      new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.55, metalness: 0.25 })
+      new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.36, metalness: 0.36 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -352,6 +365,7 @@ window.GroupBRally = window.GroupBRally || {};
     syncLabels();
 
     function onChange() {
+      var prevQuality = settings.quality;
       settings.controlMode = elControlMode.value;
       settings.assists = elAssists.value;
       settings.transmission = elTrans.value;
@@ -364,7 +378,11 @@ window.GroupBRally = window.GroupBRally || {};
       settings.sfxVol = parseFloat(elSfx.value);
       settings.voiceEnabled = elVoice.checked;
 
+      G.setTextureQuality(settings.quality);
       renderer.shadowMap.enabled = settings.quality !== 'low';
+      if (settings.quality !== prevQuality) {
+        rebuildGarageCar();
+      }
       raceCamera.fov = settings.fov;
       raceCamera.updateProjectionMatrix();
       G.Audio.applyVolumes(settings);
@@ -457,39 +475,58 @@ window.GroupBRally = window.GroupBRally || {};
 
     // Build fresh 3D race scene
     raceScene = new THREE.Scene();
+    G.setTextureQuality(settings.quality);
+    var isHigh = settings.quality === 'high';
     raceScene.background = new THREE.Color(trackDef.skyHorizon);
     raceScene.fog = new THREE.FogExp2(trackDef.fogColor, trackDef.fogDensity);
 
-    // Sky Dome Gradient
-    var skyGeo = new THREE.SphereGeometry(520, 24, 16);
-    var skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      uniforms: {
-        topColor: { value: new THREE.Color(trackDef.skyTop) },
-        bottomColor: { value: new THREE.Color(trackDef.skyHorizon) }
-      },
-      vertexShader: 'varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; varying vec3 vPos; void main() { float h = clamp(normalize(vPos).y * 1.4, 0.0, 1.0); gl_FragColor = vec4(mix(bottomColor, topColor, pow(h, 0.65)), 1.0); }'
-    });
-    raceScene.add(new THREE.Mesh(skyGeo, skyMat));
+    // Volumetric Atmospheric Sky Dome (with Sun Disc + Scattering Corona + Wisps on High)
+    skyMesh = G.createSkyDomeMesh
+      ? G.createSkyDomeMesh(trackDef, sunOffset, isHigh)
+      : new THREE.Mesh(
+          new THREE.SphereGeometry(520, 24, 16),
+          new THREE.ShaderMaterial({
+            side: THREE.BackSide,
+            depthWrite: false,
+            uniforms: {
+              topColor: { value: new THREE.Color(trackDef.skyTop) },
+              bottomColor: { value: new THREE.Color(trackDef.skyHorizon) }
+            },
+            vertexShader: 'varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+            fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; varying vec3 vPos; void main() { float h = clamp(normalize(vPos).y * 1.4, 0.0, 1.0); gl_FragColor = vec4(mix(bottomColor, topColor, pow(h, 0.65)), 1.0); }'
+          })
+        );
+    raceScene.add(skyMesh);
 
-    // Biome Lighting
-    var hemi = new THREE.HemisphereLight(trackDef.skyTop, trackDef.ambientColor, 0.78);
+    // Biome Lighting (Remade sky fill + key sun + opposite sky bounce on High)
+    var hemi = new THREE.HemisphereLight(trackDef.skyTop, trackDef.ambientColor, isHigh ? 0.92 : 0.78);
     raceScene.add(hemi);
 
-    var sun = new THREE.DirectionalLight(trackDef.sunColor, trackDef.sunIntensity);
-    sun.position.set(120, 190, -140);
+    sunLight = new THREE.DirectionalLight(trackDef.sunColor, isHigh ? trackDef.sunIntensity * 1.15 : trackDef.sunIntensity);
+    sunLight.position.copy(sunOffset);
     if (settings.quality !== 'low') {
-      sun.castShadow = true;
-      sun.shadow.mapSize.set(settings.quality === 'high' ? 2048 : 1024, settings.quality === 'high' ? 2048 : 1024);
-      sun.shadow.camera.near = 20;
-      sun.shadow.camera.far = 520;
-      var d = 140;
-      sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
-      sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
+      sunLight.castShadow = true;
+      var maxTex = (renderer.capabilities && renderer.capabilities.maxTextureSize) ? renderer.capabilities.maxTextureSize : 2048;
+      var smSize = isHigh ? Math.min(4096, maxTex) : 1024;
+      sunLight.shadow.mapSize.set(smSize, smSize);
+      sunLight.shadow.camera.near = 10;
+      sunLight.shadow.camera.far = 480;
+      sunFrustumHalf = isHigh ? 75 : 105;
+      sunLight.shadow.camera.left = -sunFrustumHalf;
+      sunLight.shadow.camera.right = sunFrustumHalf;
+      sunLight.shadow.camera.top = sunFrustumHalf;
+      sunLight.shadow.camera.bottom = -sunFrustumHalf;
+      sunLight.shadow.bias = -0.0004;
+      sunLight.shadow.normalBias = 0.035;
     }
-    raceScene.add(sun);
+    raceScene.add(sunLight);
+    raceScene.add(sunLight.target);
+
+    if (isHigh) {
+      var bounceLight = new THREE.DirectionalLight(trackDef.skyHorizon, trackDef.sunIntensity * 0.28);
+      bounceLight.position.set(-sunOffset.x, sunOffset.y * 0.45, -sunOffset.z);
+      raceScene.add(bounceLight);
+    }
 
     // Build Track + Scenery
     activeTrack = new G.TrackInstance(trackDef, settings.quality).build();
@@ -788,12 +825,14 @@ window.GroupBRally = window.GroupBRally || {};
     if (mode === 'MENU') {
       if (!isDraggingGarage) turntableYaw += dt * 0.35;
       garagePivot.rotation.y = turntableYaw;
-      renderer.render(menuScene, menuCamera);
+      if (reshade) reshade.render(menuScene, menuCamera, settings.quality === 'high');
+      else renderer.render(menuScene, menuCamera);
       return;
     }
 
     if (mode === 'PAUSED' || mode === 'FINISHED') {
-      renderer.render(raceScene, raceCamera);
+      if (reshade) reshade.render(raceScene, raceCamera, settings.quality === 'high');
+      else renderer.render(raceScene, raceCamera);
       return;
     }
 
@@ -919,6 +958,19 @@ window.GroupBRally = window.GroupBRally || {};
     // Update biome weather & tyre spray particles
     activeTrack.updateEffects(phys.pos, dt);
 
+    // Track atmospheric sky dome & texel-snapped directional shadows with the car across the whole stage
+    if (skyMesh) {
+      skyMesh.position.set(phys.pos.x, phys.pos.y * 0.2, phys.pos.z);
+    }
+    if (sunLight && sunLight.castShadow) {
+      var texel = (sunFrustumHalf * 2) / (sunLight.shadow.mapSize.width || 2048);
+      var sx = Math.round(phys.pos.x / texel) * texel;
+      var sz = Math.round(phys.pos.z / texel) * texel;
+      sunLight.target.position.set(sx, phys.pos.y, sz);
+      sunLight.position.set(sx + sunOffset.x, phys.pos.y + sunOffset.y, sz + sunOffset.z);
+      sunLight.target.updateMatrixWorld();
+    }
+
     // Update Web Audio synthesis
     G.Audio.update({
       rpm: phys.rpm,
@@ -931,7 +983,8 @@ window.GroupBRally = window.GroupBRally || {};
       airborne: phys.airborne
     }, dt);
 
-    renderer.render(raceScene, raceCamera);
+    if (reshade) reshade.render(raceScene, raceCamera, settings.quality === 'high');
+    else renderer.render(raceScene, raceCamera);
   }
 
   // Boot Application

@@ -6,6 +6,11 @@ window.GroupBRally = window.GroupBRally || {};
 (function (G) {
   'use strict';
 
+  G.textureQuality = 'high';
+  G.setTextureQuality = function (quality) {
+    G.textureQuality = quality || 'medium';
+  };
+
   function makeCanvas(w, h) {
     var c = document.createElement('canvas');
     c.width = w;
@@ -23,7 +28,7 @@ window.GroupBRally = window.GroupBRally || {};
     if (srgb) {
       tex.encoding = THREE.sRGBEncoding;
     }
-    tex.anisotropy = 4;
+    tex.anisotropy = G.textureQuality === 'high' ? 16 : 4;
     return tex;
   }
 
@@ -32,9 +37,13 @@ window.GroupBRally = window.GroupBRally || {};
    * Supports surface modes: 'tarmac', 'wet_tarmac', 'snow', 'ice', 'forest', 'jungle'.
    */
   G.createRoadTexture = function (mode) {
+    var isHigh = G.textureQuality === 'high';
     var w = 512, h = 512;
-    var c = makeCanvas(w, h);
+    var physW = isHigh ? 1024 : 512, physH = isHigh ? 1024 : 512;
+    var c = makeCanvas(physW, physH);
     var ctx = c.getContext('2d');
+    ctx.save();
+    ctx.scale(physW / w, physH / h);
 
     var isTarmac = mode === 'tarmac';
     var isWetTarmac = mode === 'wet_tarmac';
@@ -193,14 +202,219 @@ window.GroupBRally = window.GroupBRally || {};
       ctx.stroke();
     }
 
+    ctx.restore();
+
+    if (isHigh) {
+      // High-resolution micro-detail pass at native 1024x1024
+      if (isTarmac || isWetTarmac) {
+        for (var a = 0; a < 9000; a++) {
+          var ax = rand() * physW;
+          var ay = rand() * physH;
+          var ar = 0.8 + rand() * 1.6;
+          ctx.fillStyle = rand() > 0.5 ? 'rgba(255,255,255,0.065)' : 'rgba(12,16,24,0.11)';
+          ctx.fillRect(ax, ay, ar, ar);
+        }
+        // Fine hairline asphalt tar seams / weathering cracks near edges
+        ctx.strokeStyle = isWetTarmac ? 'rgba(8,14,22,0.34)' : 'rgba(26,30,38,0.28)';
+        ctx.lineWidth = 1.2;
+        for (var cr = 0; cr < 28; cr++) {
+          var cx = rand() * physW;
+          var cy = rand() * physH;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          for (var seg = 0; seg < 4; seg++) {
+            cx += (rand() - 0.5) * 28;
+            cy += 12 + rand() * 24;
+            ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+        }
+        if (isWetTarmac) {
+          // Glinting longitudinal standing-water puddles along wheel tracks
+          for (var p = 0; p < 34; p++) {
+            var px = (p % 2 === 0 ? physW * 0.31 : physW * 0.69) + (rand() - 0.5) * 90;
+            var py = rand() * physH;
+            var pw = 18 + rand() * 34;
+            var ph = 55 + rand() * 140;
+            var pg = ctx.createRadialGradient(px, py, 2, px, py, Math.max(pw, ph) * 0.65);
+            pg.addColorStop(0, 'rgba(210,232,255,0.20)');
+            pg.addColorStop(0.65, 'rgba(30,48,70,0.22)');
+            pg.addColorStop(1, 'rgba(15,23,42,0)');
+            ctx.fillStyle = pg;
+            ctx.beginPath();
+            ctx.ellipse(px, py, pw, ph, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else if (isSnow) {
+        // Fine wind-blown frost sparkles & crisp compacted tire groove micro-grain
+        for (var sf = 0; sf < 7500; sf++) {
+          var sfx = rand() * physW;
+          var sfy = rand() * physH;
+          var sfr = 0.8 + rand() * 1.8;
+          ctx.fillStyle = rand() > 0.35 ? 'rgba(255,255,255,0.24)' : 'rgba(130,162,198,0.16)';
+          ctx.fillRect(sfx, sfy, sfr, sfr);
+        }
+      } else {
+        // High-res crushed gravel pebbles & crisp tire lug imprints
+        for (var gv = 0; gv < 8500; gv++) {
+          var gvx = rand() * physW;
+          var gvy = rand() * physH;
+          var gvr = 1 + rand() * 2.2;
+          ctx.fillStyle = rand() > 0.52 ? 'rgba(225,205,175,0.14)' : 'rgba(28,18,10,0.18)';
+          ctx.fillRect(gvx, gvy, gvr, gvr);
+        }
+      }
+    }
+
     return makeTexture(c, 1, 1, true);
+  };
+
+  /**
+   * Generates a linear grayscale bump map matched to the road surface mode.
+   */
+  G.createRoadBumpMap = function (mode) {
+    var isHigh = G.textureQuality === 'high';
+    var w = isHigh ? 512 : 256, h = isHigh ? 512 : 256;
+    var c = makeCanvas(w, h);
+    var ctx = c.getContext('2d');
+
+    var isTarmac = mode === 'tarmac';
+    var isWetTarmac = mode === 'wet_tarmac';
+    var isIce = mode === 'ice';
+    var isSnow = mode === 'snow' || isIce;
+
+    var seed = (mode === 'forest' ? 1919 : (mode === 'jungle' ? 2727 : (isTarmac ? 3434 : (isWetTarmac ? 4545 : 5656))));
+    function rand() {
+      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+      return ((seed >>> 0) / 4294967296);
+    }
+
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, w, h);
+
+    if (isTarmac || isWetTarmac) {
+      var grains = isHigh ? 5200 : 1800;
+      for (var i = 0; i < grains; i++) {
+        var gx = rand() * w;
+        var gy = rand() * h;
+        var gr = 1 + rand() * 1.8;
+        ctx.fillStyle = rand() > 0.5 ? 'rgba(235,235,235,0.22)' : 'rgba(25,25,25,0.25)';
+        ctx.fillRect(gx, gy, gr, gr);
+      }
+      // Slight depressed tire tracks & rough gravel shoulder
+      ctx.fillStyle = isWetTarmac ? 'rgba(40,40,40,0.28)' : 'rgba(65,65,65,0.18)';
+      ctx.fillRect(w * 0.24, 0, w * 0.14, h);
+      ctx.fillRect(w * 0.62, 0, w * 0.14, h);
+      // Rough road shoulder outside painted white lines
+      for (var sh = 0; sh < 1200; sh++) {
+        var sx = rand() > 0.5 ? rand() * w * 0.08 : w * 0.92 + rand() * w * 0.08;
+        var sy = rand() * h;
+        ctx.fillStyle = rand() > 0.5 ? 'rgba(240,240,240,0.35)' : 'rgba(20,20,20,0.35)';
+        ctx.fillRect(sx, sy, 2 + rand() * 3, 2 + rand() * 3);
+      }
+    } else if (isSnow) {
+      // Softly sculpted longitudinal snow ruts & compacted ridges
+      var rutG = ctx.createLinearGradient(0, 0, w, 0);
+      rutG.addColorStop(0.00, 'rgba(215,215,215,0.45)');
+      rutG.addColorStop(0.24, 'rgba(190,190,190,0.25)');
+      rutG.addColorStop(0.31, 'rgba(45,45,45,0.55)');
+      rutG.addColorStop(0.39, 'rgba(185,185,185,0.30)');
+      rutG.addColorStop(0.50, 'rgba(220,220,220,0.40)');
+      rutG.addColorStop(0.61, 'rgba(185,185,185,0.30)');
+      rutG.addColorStop(0.69, 'rgba(45,45,45,0.55)');
+      rutG.addColorStop(0.76, 'rgba(190,190,190,0.25)');
+      rutG.addColorStop(1.00, 'rgba(215,215,215,0.45)');
+      ctx.fillStyle = rutG;
+      ctx.fillRect(0, 0, w, h);
+
+      var flakes = isHigh ? 3600 : 1200;
+      for (var f = 0; f < flakes; f++) {
+        ctx.fillStyle = rand() > 0.5 ? 'rgba(245,245,245,0.20)' : 'rgba(70,70,70,0.18)';
+        ctx.fillRect(rand() * w, rand() * h, 1.5 + rand() * 3.5, 2 + rand() * 6);
+      }
+      if (isIce) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        for (var sc = 0; sc < 48; sc++) {
+          var icx = rand() * w;
+          ctx.beginPath();
+          ctx.moveTo(icx, 0);
+          ctx.lineTo(icx + (rand() - 0.5) * 6, h);
+          ctx.stroke();
+        }
+      }
+    } else {
+      // Gravel / Dirt deep ruts & loose pebbles
+      var gGrad = ctx.createLinearGradient(0, 0, w, 0);
+      gGrad.addColorStop(0.00, 'rgba(220,220,220,0.4)');
+      gGrad.addColorStop(0.30, 'rgba(42,42,42,0.52)');
+      gGrad.addColorStop(0.50, 'rgba(210,210,210,0.35)');
+      gGrad.addColorStop(0.70, 'rgba(42,42,42,0.52)');
+      gGrad.addColorStop(1.00, 'rgba(220,220,220,0.4)');
+      ctx.fillStyle = gGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      var stones = isHigh ? 6400 : 2200;
+      for (var st = 0; st < stones; st++) {
+        var stx = rand() * w;
+        var sty = rand() * h;
+        var str = 1.2 + rand() * 3.2;
+        ctx.fillStyle = rand() > 0.48 ? 'rgba(245,245,245,0.30)' : 'rgba(18,18,18,0.32)';
+        ctx.fillRect(stx, sty, str, str);
+      }
+    }
+
+    return makeTexture(c, 1, 1, false);
+  };
+
+  /**
+   * Generates a linear roughness map for wet tarmac (dark = glossy standing puddles, light = damp asphalt).
+   */
+  G.createWetRoughnessMap = function () {
+    var w = 512, h = 512;
+    var c = makeCanvas(w, h);
+    var ctx = c.getContext('2d');
+    var seed = 8808;
+    function rand() {
+      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+      return ((seed >>> 0) / 4294967296);
+    }
+
+    // Damp asphalt base roughness (~0.62)
+    ctx.fillStyle = '#9e9e9e';
+    ctx.fillRect(0, 0, w, h);
+
+    // Wheel track slickness (~0.32)
+    ctx.fillStyle = 'rgba(72,72,72,0.55)';
+    ctx.fillRect(w * 0.23, 0, w * 0.16, h);
+    ctx.fillRect(w * 0.61, 0, w * 0.16, h);
+
+    // Glossy standing water puddles (~0.08 roughness -> mirror-like sun glint)
+    for (var i = 0; i < 48; i++) {
+      var px = (i % 3 === 0 ? w * 0.31 : (i % 3 === 1 ? w * 0.69 : w * 0.5)) + (rand() - 0.5) * 65;
+      var py = rand() * h;
+      var rx = 14 + rand() * 28;
+      var ry = 35 + rand() * 90;
+      var pg = ctx.createRadialGradient(px, py, 2, px, py, Math.max(rx, ry));
+      pg.addColorStop(0, 'rgba(18,18,18,0.92)');
+      pg.addColorStop(0.6, 'rgba(38,38,38,0.75)');
+      pg.addColorStop(1, 'rgba(150,150,150,0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    return makeTexture(c, 1, 1, false);
   };
 
   /**
    * Generates biome ground terrain texture
    */
   G.createGroundTexture = function (biome) {
-    var w = 256, h = 256;
+    var isHigh = G.textureQuality === 'high';
+    var w = isHigh ? 512 : 256, h = isHigh ? 512 : 256;
     var c = makeCanvas(w, h);
     var ctx = c.getContext('2d');
 
@@ -223,10 +437,11 @@ window.GroupBRally = window.GroupBRally || {};
       return ((seed >>> 0) / 4294967296);
     }
 
-    for (var i = 0; i < 2400; i++) {
+    var count = isHigh ? 9000 : 2400;
+    for (var i = 0; i < count; i++) {
       var x = rand() * w;
       var y = rand() * h;
-      var r = 1 + rand() * 4;
+      var r = (isHigh ? 1.2 : 1) + rand() * (isHigh ? 5 : 4);
       if (biome === 'snow') {
         ctx.fillStyle = rand() > 0.45 ? 'rgba(255,255,255,0.28)' : 'rgba(165,188,212,0.24)';
       } else if (biome === 'jungle') {
@@ -239,6 +454,21 @@ window.GroupBRally = window.GroupBRally || {};
       ctx.fillRect(x, y, r, r);
     }
 
+    if (isHigh) {
+      // Subtle clumping patches & blade/soil micro-contrast
+      for (var p = 0; p < 160; p++) {
+        var px = rand() * w;
+        var py = rand() * h;
+        var pr = 10 + rand() * 26;
+        ctx.fillStyle = biome === 'snow'
+          ? (rand() > 0.5 ? 'rgba(248,252,255,0.12)' : 'rgba(148,176,208,0.12)')
+          : (rand() > 0.5 ? 'rgba(25,36,18,0.12)' : 'rgba(110,124,78,0.10)');
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     return makeTexture(c, 120, 120, true);
   };
 
@@ -246,9 +476,13 @@ window.GroupBRally = window.GroupBRally || {};
    * High-contrast rally corner chevron sign texture ('left' or 'right')
    */
   G.createChevronTexture = function (dir) {
+    var isHigh = G.textureQuality === 'high';
     var w = 256, h = 128;
-    var c = makeCanvas(w, h);
+    var physW = isHigh ? 512 : 256, physH = isHigh ? 256 : 128;
+    var c = makeCanvas(physW, physH);
     var ctx = c.getContext('2d');
+    ctx.save();
+    ctx.scale(physW / w, physH / h);
 
     ctx.fillStyle = '#facc15';
     ctx.fillRect(0, 0, w, h);
@@ -278,9 +512,11 @@ window.GroupBRally = window.GroupBRally || {};
       ctx.closePath();
       ctx.fill();
     }
+    ctx.restore();
 
     var tex = new THREE.CanvasTexture(c);
     tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = isHigh ? 16 : 4;
     return tex;
   };
 
@@ -288,9 +524,13 @@ window.GroupBRally = window.GroupBRally || {};
    * Start / Finish / Sector rally gantry banner texture
    */
   G.createBannerTexture = function (title, subtitle, bgHex, accentHex) {
+    var isHigh = G.textureQuality === 'high';
     var w = 512, h = 128;
-    var c = makeCanvas(w, h);
+    var physW = isHigh ? 1024 : 512, physH = isHigh ? 256 : 128;
+    var c = makeCanvas(physW, physH);
     var ctx = c.getContext('2d');
+    ctx.save();
+    ctx.scale(physW / w, physH / h);
 
     ctx.fillStyle = bgHex || '#111827';
     ctx.fillRect(0, 0, w, h);
@@ -318,9 +558,11 @@ window.GroupBRally = window.GroupBRally || {};
     ctx.fillStyle = '#facc15';
     ctx.font = 'bold 20px monospace';
     ctx.fillText(subtitle, w / 2, h / 2 + 28);
+    ctx.restore();
 
     var tex = new THREE.CanvasTexture(c);
     tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = isHigh ? 16 : 4;
     return tex;
   };
 
@@ -328,9 +570,13 @@ window.GroupBRally = window.GroupBRally || {};
    * Car hood livery stripe texture tailored to each Group B car
    */
   G.createHoodLiveryTexture = function (car) {
+    var isHigh = G.textureQuality === 'high';
     var w = 512, h = 512;
-    var c = makeCanvas(w, h);
+    var physW = isHigh ? 1024 : 512, physH = isHigh ? 1024 : 512;
+    var c = makeCanvas(physW, physH);
     var ctx = c.getContext('2d');
+    ctx.save();
+    ctx.scale(physW / w, physH / h);
 
     ctx.fillStyle = car.bodyColor;
     ctx.fillRect(0, 0, w, h);
@@ -404,8 +650,20 @@ window.GroupBRally = window.GroupBRally || {};
       ctx.fillRect(w - 110 - v * 22, 390, 14, 48);
     }
 
+    if (isHigh) {
+      // Crisp panel shutlines & subtle clearcoat highlight gradient
+      ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(18, 18, w - 36, h - 36);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fillRect(93, 390, 2, 48);
+    }
+
+    ctx.restore();
+
     var tex = new THREE.CanvasTexture(c);
     tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = isHigh ? 16 : 4;
     return tex;
   };
 })(window.GroupBRally);

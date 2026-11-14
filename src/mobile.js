@@ -68,6 +68,7 @@ window.GroupBRally = window.GroupBRally || {};
   }
 
   // Three.js Renderer
+  G.setTextureQuality(settings.quality);
   var canvas = document.getElementById('game-canvas');
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -78,6 +79,7 @@ window.GroupBRally = window.GroupBRally || {};
   renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = settings.quality !== 'low';
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  var reshade = G.ReshadePipeline ? new G.ReshadePipeline(renderer) : null;
 
   var menuScene = new THREE.Scene();
   var menuCamera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -88,6 +90,10 @@ window.GroupBRally = window.GroupBRally || {};
   var lastTouchX = 0;
 
   var raceScene = null;
+  var sunLight = null;
+  var skyMesh = null;
+  var sunOffset = new THREE.Vector3(120, 190, -140);
+  var sunFrustumHalf = 75;
   var raceCamera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.08, 650);
   var activeTrack = null;
   var cockpitState = null;
@@ -141,18 +147,19 @@ window.GroupBRally = window.GroupBRally || {};
     menuCamera.position.set(3.8, 2.0, 5.4);
     menuCamera.lookAt(0, 0.5, 0);
 
-    menuScene.add(new THREE.AmbientLight(0x94a3b8, 0.65));
-    var keySpot = new THREE.SpotLight(0xfff1d6, 2.3, 24, Math.PI / 4, 0.45, 1.0);
+    menuScene.add(new THREE.AmbientLight(0x94a3b8, 0.45));
+    menuScene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.48));
+    var keySpot = new THREE.SpotLight(0xfff1d6, 2.6, 24, Math.PI / 4, 0.42, 1.0);
     keySpot.position.set(4.5, 6.2, 4.5);
     menuScene.add(keySpot);
 
-    var rimSpot = new THREE.SpotLight(0x38bdf8, 1.4, 20, Math.PI / 3.5, 0.5, 1.0);
+    var rimSpot = new THREE.SpotLight(0x38bdf8, 1.75, 20, Math.PI / 3.5, 0.45, 1.0);
     rimSpot.position.set(-5.0, 3.6, -4.0);
     menuScene.add(rimSpot);
 
     var floor = new THREE.Mesh(
       new THREE.PlaneGeometry(40, 40),
-      new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.6, metalness: 0.25 })
+      new THREE.MeshStandardMaterial({ color: 0x161b24, roughness: 0.38, metalness: 0.34 })
     );
     floor.rotation.x = -Math.PI / 2;
     menuScene.add(floor);
@@ -283,6 +290,7 @@ window.GroupBRally = window.GroupBRally || {};
     document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
 
     function update() {
+      var prevQuality = settings.quality;
       settings.controlMode = elControlMode.value;
       settings.steerMode = elSteerMode.value;
       settings.assists = elAssists.value;
@@ -292,7 +300,11 @@ window.GroupBRally = window.GroupBRally || {};
       settings.units = elUnits.value;
       settings.voiceEnabled = elVoice.checked;
       document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
+      G.setTextureQuality(settings.quality);
       renderer.shadowMap.enabled = settings.quality !== 'low';
+      if (settings.quality !== prevQuality) {
+        rebuildGarageCar();
+      }
       G.Audio.applyVolumes(settings);
       applyMobileControlVisibility();
       saveJSON(STORAGE_SETTINGS, settings);
@@ -435,34 +447,52 @@ window.GroupBRally = window.GroupBRally || {};
     var tyreDef = G.getTyre(selectedTyreId);
     G.Audio.setCarProfile(carDef);
 
+    G.setTextureQuality(settings.quality);
+    var isHigh = settings.quality === 'high';
     raceScene = new THREE.Scene();
     raceScene.background = new THREE.Color(trackDef.skyHorizon);
     raceScene.fog = new THREE.FogExp2(trackDef.fogColor, trackDef.fogDensity);
 
-    var skyGeo = new THREE.SphereGeometry(520, 20, 14);
-    var skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      uniforms: {
-        topColor: { value: new THREE.Color(trackDef.skyTop) },
-        bottomColor: { value: new THREE.Color(trackDef.skyHorizon) }
-      },
-      vertexShader: 'varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; varying vec3 vPos; void main() { float h = clamp(normalize(vPos).y * 1.4, 0.0, 1.0); gl_FragColor = vec4(mix(bottomColor, topColor, pow(h, 0.65)), 1.0); }'
-    });
-    raceScene.add(new THREE.Mesh(skyGeo, skyMat));
+    skyMesh = G.createSkyDomeMesh
+      ? G.createSkyDomeMesh(trackDef, sunOffset, isHigh)
+      : new THREE.Mesh(
+          new THREE.SphereGeometry(520, 20, 14),
+          new THREE.ShaderMaterial({
+            side: THREE.BackSide,
+            depthWrite: false,
+            uniforms: {
+              topColor: { value: new THREE.Color(trackDef.skyTop) },
+              bottomColor: { value: new THREE.Color(trackDef.skyHorizon) }
+            },
+            vertexShader: 'varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+            fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; varying vec3 vPos; void main() { float h = clamp(normalize(vPos).y * 1.4, 0.0, 1.0); gl_FragColor = vec4(mix(bottomColor, topColor, pow(h, 0.65)), 1.0); }'
+          })
+        );
+    raceScene.add(skyMesh);
 
-    raceScene.add(new THREE.HemisphereLight(trackDef.skyTop, trackDef.ambientColor, 0.8));
-    var sun = new THREE.DirectionalLight(trackDef.sunColor, trackDef.sunIntensity);
-    sun.position.set(120, 190, -140);
+    raceScene.add(new THREE.HemisphereLight(trackDef.skyTop, trackDef.ambientColor, isHigh ? 0.92 : 0.8));
+    sunLight = new THREE.DirectionalLight(trackDef.sunColor, isHigh ? trackDef.sunIntensity * 1.15 : trackDef.sunIntensity);
+    sunLight.position.copy(sunOffset);
     if (settings.quality !== 'low') {
-      sun.castShadow = true;
-      sun.shadow.mapSize.set(1024, 1024);
-      sun.shadow.camera.near = 20; sun.shadow.camera.far = 480;
-      sun.shadow.camera.left = -120; sun.shadow.camera.right = 120;
-      sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -120;
+      sunLight.castShadow = true;
+      var maxTex = (renderer.capabilities && renderer.capabilities.maxTextureSize) ? renderer.capabilities.maxTextureSize : 2048;
+      var smSize = isHigh ? Math.min(4096, maxTex) : 1024;
+      sunLight.shadow.mapSize.set(smSize, smSize);
+      sunLight.shadow.camera.near = 10; sunLight.shadow.camera.far = 480;
+      sunFrustumHalf = isHigh ? 75 : 105;
+      sunLight.shadow.camera.left = -sunFrustumHalf; sunLight.shadow.camera.right = sunFrustumHalf;
+      sunLight.shadow.camera.top = sunFrustumHalf; sunLight.shadow.camera.bottom = -sunFrustumHalf;
+      sunLight.shadow.bias = -0.0004;
+      sunLight.shadow.normalBias = 0.035;
     }
-    raceScene.add(sun);
+    raceScene.add(sunLight);
+    raceScene.add(sunLight.target);
+
+    if (isHigh) {
+      var bounceLight = new THREE.DirectionalLight(trackDef.skyHorizon, trackDef.sunIntensity * 0.28);
+      bounceLight.position.set(-sunOffset.x, sunOffset.y * 0.45, -sunOffset.z);
+      raceScene.add(bounceLight);
+    }
 
     activeTrack = new G.TrackInstance(trackDef, settings.quality).build();
     raceScene.add(activeTrack.group);
@@ -689,12 +719,14 @@ window.GroupBRally = window.GroupBRally || {};
     if (mode === 'MENU') {
       if (!dragActive) turntableYaw += dt * 0.35;
       garagePivot.rotation.y = turntableYaw;
-      renderer.render(menuScene, menuCamera);
+      if (reshade) reshade.render(menuScene, menuCamera, settings.quality === 'high');
+      else renderer.render(menuScene, menuCamera);
       return;
     }
 
     if (mode === 'PAUSED' || mode === 'FINISHED') {
-      renderer.render(raceScene, raceCamera);
+      if (reshade) reshade.render(raceScene, raceCamera, settings.quality === 'high');
+      else renderer.render(raceScene, raceCamera);
       return;
     }
 
@@ -771,6 +803,17 @@ window.GroupBRally = window.GroupBRally || {};
 
     G.updateCockpitRig(cockpitState, phys, activePacenote, settings, dt, now / 1000);
     activeTrack.updateEffects(phys.pos, dt);
+    if (skyMesh) {
+      skyMesh.position.set(phys.pos.x, phys.pos.y * 0.2, phys.pos.z);
+    }
+    if (sunLight && sunLight.castShadow) {
+      var texel = (sunFrustumHalf * 2) / (sunLight.shadow.mapSize.width || 2048);
+      var sx = Math.round(phys.pos.x / texel) * texel;
+      var sz = Math.round(phys.pos.z / texel) * texel;
+      sunLight.target.position.set(sx, phys.pos.y, sz);
+      sunLight.position.set(sx + sunOffset.x, phys.pos.y + sunOffset.y, sz + sunOffset.z);
+      sunLight.target.updateMatrixWorld();
+    }
     G.Audio.update({
       rpm: phys.rpm,
       redline: phys.car.redlineRpm,
@@ -782,7 +825,8 @@ window.GroupBRally = window.GroupBRally || {};
       airborne: phys.airborne
     }, dt);
 
-    renderer.render(raceScene, raceCamera);
+    if (reshade) reshade.render(raceScene, raceCamera, settings.quality === 'high');
+    else renderer.render(raceScene, raceCamera);
   }
 
   initMenuScene();

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>APEX GROUP B // 1986 WRC Rally Simulator</title>
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
   <!-- Fullscreen 3D WebGL Canvas (Garage Showcase in Menu, Cockpit POV in Stage) -->
@@ -161,7 +161,7 @@
             <div class="setting-item">
               <label for="set-quality">3D GRAPHICS QUALITY</label>
               <select id="set-quality">
-                <option value="high" selected>HIGH — FULL FOREST &amp; SHADOWS</option>
+                <option value="high" selected>HIGH — RESHADE ULTRA (HD TEXTURES &amp; LIGHTING)</option>
                 <option value="medium">MEDIUM — BALANCED 60 FPS</option>
                 <option value="low">LOW — MAXIMUM PERFORMANCE</option>
               </select>
@@ -349,12 +349,13 @@
 
   <!-- Scripts loaded in dependency order (works cleanly on both http:// and file://) -->
   <script src="vendor/three.min.js"></script>
-  <script src="src/data.js?v=3"></script>
-  <script src="src/textures.js?v=3"></script>
-  <script src="src/audio.js?v=3"></script>
-  <script src="src/tracks.js?v=3"></script>
-  <script src="src/carVisuals.js?v=3"></script>
-  <script src="src/physics.js?v=3"></script>
-  <script src="src/main.js?v=3"></script>
+  <script src="src/data.js?v=4"></script>
+  <script src="src/textures.js?v=4"></script>
+  <script src="src/audio.js?v=4"></script>
+  <script src="src/tracks.js?v=4"></script>
+  <script src="src/carVisuals.js?v=4"></script>
+  <script src="src/physics.js?v=4"></script>
+  <script src="src/reshade.js?v=4"></script>
+  <script src="src/main.js?v=4"></script>
 </body>
 </html>

@@ -268,10 +268,13 @@ window.GroupBRally = window.GroupBRally || {};
     geom.computeVertexNormals();
 
     var baseMode = def.biome === 'jungle' ? 'jungle' : 'forest';
+    var isHigh = this.quality === 'high';
     var materials = [
       // 0: Dirt / Gravel / Mud / Timber
       new THREE.MeshStandardMaterial({
         map: G.createRoadTexture(baseMode),
+        bumpMap: isHigh ? G.createRoadBumpMap(baseMode) : null,
+        bumpScale: isHigh ? 0.085 : 0,
         vertexColors: true,
         roughness: 0.88,
         metalness: 0.04,
@@ -280,22 +283,29 @@ window.GroupBRally = window.GroupBRally || {};
       // 1: Dry Tarmac
       new THREE.MeshStandardMaterial({
         map: G.createRoadTexture('tarmac'),
+        bumpMap: isHigh ? G.createRoadBumpMap('tarmac') : null,
+        bumpScale: isHigh ? 0.032 : 0,
         vertexColors: true,
         roughness: 0.72,
         metalness: 0.08,
         side: THREE.DoubleSide
       }),
-      // 2: Wet Tarmac (low roughness for specular storm reflections)
+      // 2: Wet Tarmac (low roughness puddles + damp asphalt contrast for reflections)
       new THREE.MeshStandardMaterial({
         map: G.createRoadTexture('wet_tarmac'),
+        bumpMap: isHigh ? G.createRoadBumpMap('wet_tarmac') : null,
+        bumpScale: isHigh ? 0.028 : 0,
+        roughnessMap: isHigh ? G.createWetRoughnessMap() : null,
         vertexColors: true,
-        roughness: 0.18,
-        metalness: 0.34,
+        roughness: isHigh ? 0.65 : 0.18,
+        metalness: isHigh ? 0.28 : 0.34,
         side: THREE.DoubleSide
       }),
       // 3: Packed Snow / Slush
       new THREE.MeshStandardMaterial({
         map: G.createRoadTexture('snow'),
+        bumpMap: isHigh ? G.createRoadBumpMap('snow') : null,
+        bumpScale: isHigh ? 0.075 : 0,
         vertexColors: true,
         roughness: 0.56,
         metalness: 0.06,
@@ -304,6 +314,8 @@ window.GroupBRally = window.GroupBRally || {};
       // 4: Glazed Black Ice
       new THREE.MeshStandardMaterial({
         map: G.createRoadTexture('ice'),
+        bumpMap: isHigh ? G.createRoadBumpMap('ice') : null,
+        bumpScale: isHigh ? 0.022 : 0,
         vertexColors: true,
         roughness: 0.14,
         metalness: 0.28,
@@ -312,6 +324,7 @@ window.GroupBRally = window.GroupBRally || {};
     ];
 
     var mesh = new THREE.Mesh(geom, materials);
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     this.group.add(mesh);
   };
@@ -686,7 +699,8 @@ window.GroupBRally = window.GroupBRally || {};
     var samples = this.samples;
     var seedMap = { forest: 101, jungle: 202, snow: 303, forest_sprint: 404, jungle_dash: 505, snow_ridge: 606, alpine_tarmac: 707, wet_tarmac_pass: 808 };
     var rand = seededRandom(seedMap[def.id] || 909);
-    var densityMult = this.quality === 'low' ? 0.5 : (this.quality === 'medium' ? 0.78 : 1.0);
+    var isHigh = this.quality === 'high';
+    var densityMult = this.quality === 'low' ? 0.5 : (this.quality === 'medium' ? 0.78 : 1.15);
 
     var dummy = new THREE.Object3D();
 
@@ -697,12 +711,14 @@ window.GroupBRally = window.GroupBRally || {};
       : new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.45 });
     var poleHeight = def.biome === 'snow' ? 1.85 : 1.05;
     var poleMesh = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.055, 0.065, poleHeight, 6),
+      new THREE.CylinderGeometry(0.055, 0.065, poleHeight, isHigh ? 8 : 6),
       poleMat,
       poleCount
     );
+    poleMesh.castShadow = isHigh;
+    poleMesh.receiveShadow = isHigh;
     var capMesh = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.065, 0.065, 0.18, 6),
+      new THREE.CylinderGeometry(0.065, 0.065, 0.18, isHigh ? 8 : 6),
       new THREE.MeshBasicMaterial({ color: def.biome === 'snow' ? 0xfef08a : 0xef4444 }),
       poleCount
     );
@@ -770,8 +786,12 @@ window.GroupBRally = window.GroupBRally || {};
     var trunks = new THREE.InstancedMesh(trunkGeom, trunkMat, treeTarget);
     var crowns = new THREE.InstancedMesh(crownGeom, crownMat, treeTarget);
     var crowns2 = new THREE.InstancedMesh(crown2Geom, crown2Mat, treeTarget);
-    trunks.castShadow = this.quality === 'high';
-    crowns.castShadow = this.quality === 'high';
+    trunks.castShadow = isHigh;
+    trunks.receiveShadow = isHigh;
+    crowns.castShadow = isHigh;
+    crowns.receiveShadow = isHigh;
+    crowns2.castShadow = isHigh;
+    crowns2.receiveShadow = isHigh;
 
     var placed = 0;
     for (var attempt = 0; attempt < treeTarget * 2 && placed < treeTarget; attempt++) {
@@ -839,12 +859,14 @@ window.GroupBRally = window.GroupBRally || {};
 
     // 3. Roadside Boulders / Ferns / Snow Mounds
     var rockTarget = Math.floor(240 * densityMult);
-    var rockGeom = new THREE.DodecahedronGeometry(1.1, 0);
+    var rockGeom = new THREE.DodecahedronGeometry(1.1, isHigh ? 1 : 0);
     var rockMat = new THREE.MeshStandardMaterial({
       color: def.biome === 'snow' ? 0x64748b : (def.biome === 'jungle' ? 0x3b4d2b : 0x57534e),
       roughness: 0.92
     });
     var rocks = new THREE.InstancedMesh(rockGeom, rockMat, rockTarget);
+    rocks.castShadow = isHigh;
+    rocks.receiveShadow = isHigh;
     var rockPlaced = 0;
     for (var r = 0; r < rockTarget * 2 && rockPlaced < rockTarget; r++) {
       var sIdx = Math.floor(rand() * (samples.length - 12)) + 6;
