@@ -9,155 +9,327 @@ window.GroupBRally = window.GroupBRally || {};
 (function (G) {
   'use strict';
 
-  /**
-   * Builds the 3D exterior Group B car for the Main Menu garage showcase.
-   */
-  G.createExteriorCar = function (carDef, tyreDef) {
-    var root = new THREE.Group();
-    var isHigh = G.textureQuality === 'high';
-    var bodyMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(carDef.bodyColor),
-      roughness: isHigh ? 0.22 : 0.28,
-      metalness: isHigh ? 0.35 : 0.2
-    });
-    var trimMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.65, metalness: 0.2 });
-    var accent1Mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentPrimary), roughness: 0.35 });
-    var accent2Mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentSecondary), roughness: 0.35 });
-    var glassMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.78 });
+  function makeBox(w, h, d, mat, pos, rot, shadow) {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(pos[0], pos[1], pos[2]);
+    if (rot) m.rotation.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
+    if (shadow) m.castShadow = true;
+    return m;
+  }
 
-    // Lower chassis tub
-    var lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.52, 4.05), bodyMat);
-    lowerBody.position.set(0, 0.54, 0);
-    lowerBody.castShadow = true;
-    root.add(lowerBody);
-
-    // Widebody Group B box flares (4 corners)
-    var flareGeom = new THREE.BoxGeometry(0.18, 0.42, 0.92);
-    [[-0.92, -1.25], [0.92, -1.25], [-0.94, 1.25], [0.94, 1.25]].forEach(function (pos) {
-      var flare = new THREE.Mesh(flareGeom, bodyMat);
-      flare.position.set(pos[0], 0.52, pos[1]);
-      flare.castShadow = true;
-      root.add(flare);
-    });
-
-    // Front aero chin splitter + mudflaps
-    var splitter = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.10, 0.32), trimMat);
-    splitter.position.set(0, 0.27, -2.06);
-    root.add(splitter);
-
-    var mudflapGeom = new THREE.BoxGeometry(0.28, 0.26, 0.04);
-    var flapMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentPrimary), roughness: 0.7 });
-    [-0.78, 0.78].forEach(function (x) {
-      var flap = new THREE.Mesh(mudflapGeom, flapMat);
-      flap.position.set(x, 0.24, 1.85);
-      root.add(flap);
-    });
-
-    // Hood / Bonnet with livery texture
-    var hoodTex = G.createHoodLiveryTexture(carDef);
-    var hoodMat = new THREE.MeshStandardMaterial({ map: hoodTex, roughness: isHigh ? 0.24 : 0.3, metalness: isHigh ? 0.24 : 0.1 });
-    var hood = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.08, 1.35), hoodMat);
-    hood.position.set(0, 0.81, -1.22);
-    hood.rotation.x = 0.05;
-    hood.castShadow = true;
-    root.add(hood);
-
-    // Cabin greenhouse
-    var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.54, 1.75), bodyMat);
-    cabin.position.set(0, 1.05, 0.22);
-    cabin.castShadow = true;
-    root.add(cabin);
-
-    // Windshield & rear/side glass
-    var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.44, 0.06), glassMat);
-    windshield.position.set(0, 1.04, -0.65);
-    windshield.rotation.x = -0.52;
-    root.add(windshield);
-
-    var sideGlass = new THREE.Mesh(new THREE.BoxGeometry(1.51, 0.38, 1.25), glassMat);
-    sideGlass.position.set(0, 1.06, 0.22);
-    root.add(sideGlass);
-
-    // Roof air scoop (iconic for T16 / S4)
-    if (carDef.hoodStyle === 's4' || carDef.hoodStyle === 't16') {
-      var scoop = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.14, 0.58), accent1Mat);
-      scoop.position.set(0, 1.36, 0.12);
-      root.add(scoop);
-    }
-
-    // Livery side stripes
-    var sideStripe1 = new THREE.Mesh(new THREE.BoxGeometry(1.81, 0.11, 3.65), accent1Mat);
-    sideStripe1.position.set(0, 0.58, 0);
-    root.add(sideStripe1);
-    var sideStripe2 = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.06, 3.65), accent2Mat);
-    sideStripe2.position.set(0, 0.48, 0);
-    root.add(sideStripe2);
-
-    // Massive Group B Rear Wing
-    var wingPlane = new THREE.Mesh(new THREE.BoxGeometry(1.76, 0.07, 0.46), accent1Mat);
-    wingPlane.position.set(0, 1.32, 1.88);
-    wingPlane.rotation.x = 0.12;
-    wingPlane.castShadow = true;
-    root.add(wingPlane);
-
-    var endplateGeom = new THREE.BoxGeometry(0.06, 0.48, 0.52);
-    [-0.86, 0.86].forEach(function (x) {
-      var ep = new THREE.Mesh(endplateGeom, bodyMat);
-      ep.position.set(x, 1.12, 1.88);
-      root.add(ep);
-    });
-
-    // Quad Rally Light Pod on the nose!
-    var podBar = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.14, 0.18), trimMat);
-    podBar.position.set(0, 0.72, -2.02);
-    root.add(podBar);
-    var lampMat = new THREE.MeshBasicMaterial({ color: 0xfff8d6 });
-    [-0.38, -0.13, 0.13, 0.38].forEach(function (lx) {
-      var lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.08, 12), lampMat);
-      lamp.rotation.x = Math.PI / 2;
-      lamp.position.set(lx, 0.74, -2.10);
-      root.add(lamp);
-    });
-
-    // Taillights & dual rally exhausts
-    var tailMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-    [-0.62, 0.62].forEach(function (tx) {
-      var tl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.14, 0.06), tailMat);
-      tl.position.set(tx, 0.62, 2.02);
-      root.add(tl);
-    });
-    var exMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.85, roughness: 0.3 });
-    var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.25, 10), exMat);
-    ex.rotation.x = Math.PI / 2;
-    ex.position.set(0.48, 0.30, 2.04);
-    root.add(ex);
-
-    // 4 Rally Wheels reflecting selected tyre compound
+  function addWheelSet(root, carDef, tyreDef, cfg) {
     var tyreMat = new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.88 });
-    var rimColor = carDef.id === 'veltro_037' ? 0xeab308 : 0xf1f5f9;
-    var rimMat = new THREE.MeshStandardMaterial({ color: rimColor, roughness: 0.35, metalness: 0.45 });
+    var rimColor = carDef.id === 'veltro_037' ? 0xeab308 : (carDef.id === 'bergmeister_q85' ? 0xe2e8f0 : 0xf8fafc);
+    var rimMat = new THREE.MeshStandardMaterial({ color: rimColor, roughness: 0.32, metalness: 0.52 });
+    var hubMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.4, metalness: 0.7 });
     var sidewallMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(tyreDef ? tyreDef.sidewallColor : '#e5a93c'),
       roughness: 0.6
     });
 
+    var halfT = (carDef.trackWidth * 0.5) + 0.05;
+    var wr = cfg.wheelRadius || 0.35;
+    var tw = cfg.tireWidth || 0.27;
+    var positions = [
+      [-halfT, wr, cfg.frontAxleZ, true],
+      [halfT, wr, cfg.frontAxleZ, true],
+      [-halfT - 0.02, wr, cfg.rearAxleZ, false],
+      [halfT + 0.02, wr, cfg.rearAxleZ, false]
+    ];
+
     var wheels = [];
-    [[-0.86, 0.35, -1.25], [0.86, 0.35, -1.25], [-0.88, 0.35, 1.25], [0.88, 0.35, 1.25]].forEach(function (p) {
+    positions.forEach(function (p) {
       var wg = new THREE.Group();
-      var tire = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.26, 20), tyreMat);
+      var tire = new THREE.Mesh(new THREE.CylinderGeometry(wr, wr, tw, 22), tyreMat);
       tire.rotation.z = Math.PI / 2;
       tire.castShadow = true;
-      var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.27, 14), rimMat);
+      var rim = new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.64, wr * 0.64, tw + 0.015, 16), rimMat);
       rim.rotation.z = Math.PI / 2;
-      var stripeRing = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.265, 16), sidewallMat);
+      var stripeRing = new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.78, wr * 0.78, tw + 0.008, 18), sidewallMat);
       stripeRing.rotation.z = Math.PI / 2;
       wg.add(tire, stripeRing, rim);
+
+      if (cfg.turbofanFront && p[3]) {
+        // Group B white aero brake-cooling turbofan disc cover on front axle
+        var fanMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.15 });
+        var fan = new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.66, wr * 0.66, 0.03, 18), fanMat);
+        fan.rotation.z = Math.PI / 2;
+        fan.position.x = p[0] < 0 ? -(tw * 0.5 + 0.01) : (tw * 0.5 + 0.01);
+        wg.add(fan);
+      } else {
+        var nut = new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.2, wr * 0.2, tw + 0.025, 8), hubMat);
+        nut.rotation.z = Math.PI / 2;
+        wg.add(nut);
+      }
+
       wg.position.set(p[0], p[1], p[2]);
       root.add(wg);
       wheels.push(wg);
     });
+    return wheels;
+  }
 
-    root.userData.wheels = wheels;
+  function addQuadLightPod(root, trimMat, lampMat, zPos, yPos, span, radius) {
+    root.add(makeBox(span * 2.5, radius * 1.6, 0.16, trimMat, [0, yPos, zPos]));
+    [-span, -span * 0.34, span * 0.34, span].forEach(function (lx) {
+      var lamp = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.08, 14), lampMat);
+      lamp.rotation.x = Math.PI / 2;
+      lamp.position.set(lx, yPos + 0.015, zPos - 0.08);
+      root.add(lamp);
+    });
+  }
+
+  function buildExteriorQ85(root, carDef, mats) {
+    // 1985 Bergmeister Q85 S1: Short 2.24m wheelbase, long overhanging nose, massive boxy E2 flares & snowplow aero
+    var frontZ = -1.04, rearZ = 1.20;
+    root.add(makeBox(1.86, 0.50, 4.18, mats.body, [0, 0.53, -0.06], null, true));
+    // Deep boxy Evo 2 square wheel arches bridging doors (trackWidth 1.62m)
+    [[-0.95, frontZ], [0.95, frontZ], [-0.96, rearZ], [0.96, rearZ]].forEach(function (fp) {
+      root.add(makeBox(0.24, 0.44, 0.96, mats.body, [fp[0], 0.51, fp[1]], null, true));
+    });
+    root.add(makeBox(1.94, 0.22, 1.38, mats.body, [-0.0, 0.44, 0.08])); // Wide boxy side skirts
+
+    // Aggressive S1 E2 snowplow front air dam + twin brake/intercooler ducts + dive canards
+    root.add(makeBox(1.96, 0.26, 0.40, mats.trim, [0, 0.30, -2.14], [0.18, 0, 0], true));
+    root.add(makeBox(2.04, 0.06, 0.34, mats.accent1, [0, 0.19, -2.24]));
+    [-0.95, 0.95].forEach(function (sx) {
+      root.add(makeBox(0.14, 0.04, 0.36, mats.trim, [sx, 0.36, -2.14], [0.12, 0, sx < 0 ? 0.25 : -0.25]));
+    });
+    root.add(makeBox(1.24, 0.20, 0.08, mats.trim, [0, 0.62, -2.16])); // Recessed Quattro grille
+
+    // Long sculpted front bonnet with asymmetric 5-cyl turbo bulge + hood livery
+    root.add(makeBox(1.68, 0.07, 1.44, mats.hood, [0, 0.80, -1.36], [0.04, 0, 0], true));
+    root.add(makeBox(0.64, 0.065, 0.92, mats.hood, [0, 0.845, -1.38], [0.04, 0, 0]));
+
+    // Notched 2-door fastback coupe greenhouse (distinct from hatchbacks!)
+    root.add(makeBox(1.48, 0.50, 1.38, mats.body, [0, 1.03, 0.12], null, true));
+    root.add(makeBox(1.42, 0.18, 0.68, mats.body, [0, 0.92, 1.05], [0.38, 0, 0], true)); // Sloped C-pillar fastback buttress
+    root.add(makeBox(1.40, 0.42, 0.06, mats.glass, [0, 1.01, -0.58], [-0.56, 0, 0]));
+    root.add(makeBox(1.51, 0.34, 1.08, mats.glass, [0, 1.03, 0.14]));
+
+    // Audi-style diagonal livery side bands
+    root.add(makeBox(1.90, 0.11, 3.80, mats.accent1, [0, 0.58, -0.05]));
+    root.add(makeBox(1.91, 0.06, 3.80, mats.accent2, [0, 0.48, -0.05]));
+
+    // Towering multi-element Pikes Peak / S1 E2 rear decklid wing
+    root.add(makeBox(1.88, 0.07, 0.50, mats.accent1, [0, 1.44, 1.84], [0.14, 0, 0], true));
+    root.add(makeBox(1.82, 0.05, 0.32, mats.body, [0, 1.24, 1.88], [0.08, 0, 0], true));
+    [-0.90, 0.90].forEach(function (wx) {
+      root.add(makeBox(0.06, 0.72, 0.56, mats.body, [wx, 1.12, 1.84], null, true));
+    });
+
+    // Nose light pod, mudflaps, taillights & big side-exit turbo pipe
+    addQuadLightPod(root, mats.trim, mats.lamp, -2.14, 0.72, 0.40, 0.092);
+    [-0.62, 0.62].forEach(function (tx) {
+      root.add(makeBox(0.46, 0.14, 0.06, mats.tail, [tx, 0.64, 2.02]));
+      root.add(makeBox(0.28, 0.26, 0.04, mats.flap, [tx * 1.28, 0.24, 1.88]));
+    });
+    var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.28, 10), mats.exhaust);
+    ex.rotation.x = Math.PI / 2;
+    ex.position.set(-0.56, 0.30, 2.08);
+    root.add(ex);
+    return { frontAxleZ: frontZ, rearAxleZ: rearZ, wheelRadius: 0.35 };
+  }
+
+  function buildExteriorT16(root, carDef, mats) {
+    // 1985 Lionceau T16 E2: Compact 3.85m wedge hot-hatch, long 2.54m corner-tucked wheelbase, giant rear-quarter scoops & roof wing
+    var frontZ = -1.27, rearZ = 1.27;
+    root.add(makeBox(1.80, 0.49, 3.82, mats.body, [0, 0.52, 0], null, true));
+    [[-0.91, frontZ], [0.91, frontZ], [-0.93, rearZ], [0.93, rearZ]].forEach(function (fp) {
+      root.add(makeBox(0.20, 0.42, 0.88, mats.body, [fp[0], 0.50, fp[1]], null, true));
+    });
+
+    // E2 front splitter & iconic twin vertical front fender aero strake fences
+    root.add(makeBox(1.86, 0.14, 0.30, mats.trim, [0, 0.26, -1.94], null, true));
+    [-0.78, 0.78].forEach(function (fx) {
+      root.add(makeBox(0.045, 0.20, 0.52, mats.accent1, [fx, 0.84, -1.42], [0.16, 0, 0]));
+    });
+
+    // Short steep compact hood
+    root.add(makeBox(1.62, 0.07, 1.06, mats.hood, [0, 0.79, -1.22], [0.09, 0, 0], true));
+    root.add(makeBox(0.56, 0.04, 0.34, mats.trim, [0, 0.84, -1.16], [0.09, 0, 0]));
+
+    // Flat-back upright Group B hatchback greenhouse
+    root.add(makeBox(1.50, 0.54, 1.88, mats.body, [0, 1.04, 0.54], null, true));
+    root.add(makeBox(1.40, 0.44, 0.06, mats.glass, [0, 1.03, -0.42], [-0.52, 0, 0]));
+    root.add(makeBox(1.53, 0.38, 1.46, mats.glass, [0, 1.05, 0.54]));
+    root.add(makeBox(1.32, 0.38, 0.06, mats.glass, [0, 1.04, 1.50], [0.22, 0, 0])); // Slatted rear engine deck window
+
+    // Signature giant rear-quarter mid-engine turbo air scoops behind the doors
+    [-0.95, 0.95].forEach(function (sx) {
+      root.add(makeBox(0.22, 0.44, 0.86, mats.body, [sx, 0.76, 0.74], null, true));
+      root.add(makeBox(0.18, 0.34, 0.08, mats.trim, [sx, 0.76, 0.31]));
+    });
+
+    // Peugeot Talbot horizontal belt stripes
+    root.add(makeBox(1.83, 0.10, 3.55, mats.accent1, [0, 0.58, 0]));
+    root.add(makeBox(1.84, 0.06, 3.55, mats.accent2, [0, 0.48, 0]));
+
+    // Central roof air periscope + huge Evo 2 roof-mounted bi-plane hatchback wing
+    root.add(makeBox(0.42, 0.14, 0.62, mats.accent1, [0, 1.38, 0.16], null, true));
+    root.add(makeBox(1.78, 0.07, 0.48, mats.accent1, [0, 1.42, 1.82], [0.10, 0, 0], true));
+    root.add(makeBox(1.72, 0.05, 0.28, mats.accent2, [0, 1.24, 1.86], [0.06, 0, 0]));
+    [-0.86, 0.86].forEach(function (wx) {
+      root.add(makeBox(0.06, 0.66, 0.54, mats.body, [wx, 1.15, 1.82], null, true));
+    });
+
+    addQuadLightPod(root, mats.trim, mats.lamp, -1.94, 0.69, 0.36, 0.085);
+    [-0.58, 0.58].forEach(function (tx) {
+      root.add(makeBox(0.40, 0.14, 0.06, mats.tail, [tx, 0.60, 1.91]));
+      root.add(makeBox(0.26, 0.24, 0.04, mats.flap, [tx * 1.26, 0.23, 1.78]));
+    });
+    var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.22, 10), mats.exhaust);
+    ex.rotation.x = Math.PI / 2;
+    ex.position.set(0.48, 0.28, 1.93);
+    root.add(ex);
+    return { frontAxleZ: frontZ, rearAxleZ: rearZ, wheelRadius: 0.35 };
+  }
+
+  function buildExterior037(root, carDef, mats) {
+    // 1983 Veltro 037 Corsa: Low-slung Pininfarina Italian Berlinetta wedge, RWD open rear buttresses, twin shotgun exhausts & gold OZ wheels
+    var frontZ = -1.22, rearZ = 1.22;
+    root.add(makeBox(1.70, 0.41, 4.02, mats.body, [0, 0.44, 0], null, true));
+    // Pinched mid-waist + curved flared wheel arches (narrower 1.54m track)
+    [[-0.87, frontZ], [0.87, frontZ], [-0.90, rearZ], [0.90, rearZ]].forEach(function (fp) {
+      root.add(makeBox(0.18, 0.38, 0.94, mats.body, [fp[0], 0.45, fp[1]], null, true));
+    });
+
+    // Sleek sloped wedge nose + twin-kidney dark front grille
+    root.add(makeBox(1.76, 0.12, 0.34, mats.trim, [0, 0.24, -1.98], [0.10, 0, 0], true));
+    root.add(makeBox(1.36, 0.18, 0.06, mats.trim, [0, 0.48, -2.02]));
+    root.add(makeBox(1.62, 0.06, 1.32, mats.hood, [0, 0.67, -1.28], [0.09, 0, 0], true));
+    // Signature twin longitudinal Pininfarina front fender humps
+    [-0.36, 0.36].forEach(function (hx) {
+      root.add(makeBox(0.24, 0.05, 0.96, mats.body, [hx, 0.72, -1.28], [0.09, 0, 0]));
+    });
+
+    // Low sleek cabin canopy + signature flying fastback rear buttresses over supercharged mid-engine
+    root.add(makeBox(1.42, 0.42, 1.32, mats.body, [0, 0.89, -0.02], null, true));
+    root.add(makeBox(1.34, 0.36, 0.05, mats.glass, [0, 0.87, -0.69], [-0.62, 0, 0]));
+    root.add(makeBox(1.45, 0.28, 0.96, mats.glass, [0, 0.90, -0.02]));
+    [-0.58, 0.58].forEach(function (bx) {
+      root.add(makeBox(0.16, 0.24, 1.15, mats.body, [bx, 0.84, 1.02], [0.22, 0, 0], true));
+    });
+    // Louvered flat engine cover between flying buttresses
+    root.add(makeBox(0.96, 0.06, 1.05, mats.trim, [0, 0.68, 1.08]));
+
+    // Thin Italian racing stripe accents
+    root.add(makeBox(1.73, 0.07, 3.65, mats.accent1, [0, 0.48, 0]));
+    root.add(makeBox(1.74, 0.04, 3.65, mats.accent2, [0, 0.42, 0]));
+
+    // Classic 037 arched decklid rear wing
+    root.add(makeBox(1.68, 0.06, 0.40, mats.body, [0, 1.12, 1.82], [0.10, 0, 0], true));
+    [-0.78, 0.78].forEach(function (wx) {
+      root.add(makeBox(0.06, 0.44, 0.44, mats.body, [wx, 0.90, 1.82], null, true));
+    });
+
+    // Flush quad headlamps in nose + compact fogs + signature open bumperless RWD rear w/ twin exhausts!
+    addQuadLightPod(root, mats.trim, mats.lamp, -2.01, 0.52, 0.34, 0.075);
+    [-0.56, 0.56].forEach(function (tx) {
+      root.add(makeBox(0.36, 0.11, 0.06, mats.tail, [tx, 0.56, 2.00]));
+    });
+    root.add(makeBox(1.38, 0.18, 0.12, mats.trim, [0, 0.30, 1.94])); // Exposed RWD gearbox / tubular frame
+    [-0.36, 0.36].forEach(function (exX) {
+      var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.26, 10), mats.exhaust);
+      ex.rotation.x = Math.PI / 2;
+      ex.position.set(exX, 0.26, 2.05);
+      root.add(ex);
+    });
+    return { frontAxleZ: frontZ, rearAxleZ: rearZ, wheelRadius: 0.34 };
+  }
+
+  function buildExteriorS4(root, carDef, mats) {
+    // 1986 Fulmine S4 Twin: 890kg tubular Kevlar spaceframe, massive rear-quarter twincharger air pods, roof ram scoop & front turbofan wheels
+    var frontZ = -1.22, rearZ = 1.22;
+    root.add(makeBox(1.82, 0.50, 3.98, mats.body, [0, 0.53, 0], null, true));
+    // Angular Kevlar lower rocker sills + crisp squared Group B arches
+    root.add(makeBox(1.86, 0.16, 3.92, mats.trim, [0, 0.28, 0]));
+    [[-0.93, frontZ], [0.93, frontZ], [-0.95, rearZ], [0.95, rearZ]].forEach(function (fp) {
+      root.add(makeBox(0.22, 0.42, 0.92, mats.body, [fp[0], 0.52, fp[1]], null, true));
+    });
+
+    // Deep twin-duct Kevlar front splitter & angular radiator grille
+    root.add(makeBox(1.90, 0.14, 0.36, mats.trim, [0, 0.22, -2.04], null, true));
+    root.add(makeBox(1.26, 0.22, 0.08, mats.trim, [0, 0.54, -2.00]));
+
+    // Twin-ducted front hood clamshell
+    root.add(makeBox(1.66, 0.075, 1.24, mats.hood, [0, 0.80, -1.28], [0.06, 0, 0], true));
+    root.add(makeBox(0.58, 0.065, 0.42, mats.trim, [0, 0.84, -1.22], [0.06, 0, 0]));
+
+    // Upright boxy Martini S4 greenhouse + signature tall roof cold-air ram scoop
+    root.add(makeBox(1.52, 0.54, 1.88, mats.body, [0, 1.05, 0.46], null, true));
+    root.add(makeBox(1.40, 0.44, 0.06, mats.glass, [0, 1.03, -0.50], [-0.50, 0, 0]));
+    root.add(makeBox(1.55, 0.38, 1.44, mats.glass, [0, 1.06, 0.46]));
+    root.add(makeBox(0.52, 0.18, 0.72, mats.accent1, [0, 1.40, 0.20], null, true)); // Tall roof scoop
+
+    // Huge Delta S4 twin-channel boxy rear-quarter side-pod scoops (supercharger + turbo intake!)
+    [-0.98, 0.98].forEach(function (sx) {
+      root.add(makeBox(0.26, 0.48, 1.04, mats.body, [sx, 0.74, 0.80], null, true));
+      root.add(makeBox(0.22, 0.38, 0.08, mats.trim, [sx, 0.74, 0.28]));
+      root.add(makeBox(0.27, 0.10, 0.96, mats.accent1, [sx, 0.80, 0.80]));
+      root.add(makeBox(0.28, 0.06, 0.96, mats.accent2, [sx, 0.71, 0.80]));
+    });
+
+    // Martini tricolor horizontal stripes
+    root.add(makeBox(1.85, 0.11, 3.60, mats.accent1, [0, 0.59, 0]));
+    root.add(makeBox(1.86, 0.06, 3.60, mats.accent2, [0, 0.49, 0]));
+
+    // Boxed roof-edge rear wing + open matte Kevlar rear frame + twin titanium megaphone pipes
+    root.add(makeBox(1.80, 0.075, 0.48, mats.accent1, [0, 1.38, 1.76], [0.16, 0, 0], true));
+    [-0.86, 0.86].forEach(function (wx) {
+      root.add(makeBox(0.06, 0.56, 0.52, mats.body, [wx, 1.14, 1.78], null, true));
+    });
+    root.add(makeBox(1.48, 0.26, 0.14, mats.trim, [0, 0.34, 1.94]));
+    addQuadLightPod(root, mats.trim, mats.lamp, -2.01, 0.68, 0.39, 0.088);
+    [-0.60, 0.60].forEach(function (tx) {
+      root.add(makeBox(0.42, 0.14, 0.06, mats.tail, [tx, 0.62, 1.99]));
+      root.add(makeBox(0.26, 0.24, 0.04, mats.flap, [tx * 1.28, 0.22, 1.84]));
+    });
+    [-0.22, 0.22].forEach(function (exX) {
+      var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.048, 0.28, 10), mats.exhaust);
+      ex.rotation.x = Math.PI / 2;
+      ex.position.set(exX, 0.27, 2.05);
+      root.add(ex);
+    });
+    return { frontAxleZ: frontZ, rearAxleZ: rearZ, wheelRadius: 0.35, turbofanFront: true };
+  }
+
+  /**
+   * Builds a spec-accurate 3D exterior Group B car for the Main Menu garage showcase.
+   */
+  G.createExteriorCar = function (carDef, tyreDef) {
+    var root = new THREE.Group();
+    var isHigh = G.textureQuality === 'high';
+    var mats = {
+      body: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(carDef.bodyColor),
+        roughness: isHigh ? 0.22 : 0.28,
+        metalness: isHigh ? 0.35 : 0.2
+      }),
+      trim: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.68, metalness: 0.22 }),
+      accent1: new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentPrimary), roughness: 0.35 }),
+      accent2: new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentSecondary), roughness: 0.35 }),
+      glass: new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.78 }),
+      flap: new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentPrimary), roughness: 0.7 }),
+      hood: new THREE.MeshStandardMaterial({
+        map: G.createHoodLiveryTexture(carDef),
+        roughness: isHigh ? 0.24 : 0.3,
+        metalness: isHigh ? 0.24 : 0.1
+      }),
+      lamp: new THREE.MeshBasicMaterial({ color: 0xfff8d6 }),
+      tail: new THREE.MeshBasicMaterial({ color: 0xef4444 }),
+      exhaust: new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.85, roughness: 0.3 })
+    };
+
+    var builders = {
+      bergmeister_q85: buildExteriorQ85,
+      lionceau_t16: buildExteriorT16,
+      veltro_037: buildExterior037,
+      fulmine_s4: buildExteriorS4
+    };
+    var builder = builders[carDef.id] || buildExteriorQ85;
+    var wheelCfg = builder(root, carDef, mats);
+    root.userData.wheels = addWheelSet(root, carDef, tyreDef, wheelCfg);
     return root;
   };
 
@@ -188,53 +360,75 @@ window.GroupBRally = window.GroupBRally || {};
     }
 
     // =========================================================================
-    // 1. EXTERIOR HOOD / BONNET VISIBLE THROUGH WINDSHIELD
+    // 1. EXTERIOR HOOD / BONNET VISIBLE THROUGH WINDSHIELD (Spec-Matched Per Car)
     // =========================================================================
     var hoodTex = G.createHoodLiveryTexture(carDef);
     var hoodMat = new THREE.MeshStandardMaterial({ map: hoodTex, roughness: isHigh ? 0.24 : 0.32, metalness: isHigh ? 0.25 : 0.15 });
-    var hoodMesh = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.08, 1.28), hoodMat);
-    hoodMesh.position.set(0, 0.79, -1.52);
-    hoodMesh.rotation.x = 0.045;
+
+    var hoodLen = carDef.id === 'bergmeister_q85' ? 1.44 : (carDef.id === 'lionceau_t16' ? 1.06 : 1.28);
+    var hoodW = Math.max(1.58, carDef.trackWidth + 0.08);
+    var hoodY = carDef.id === 'veltro_037' ? 0.74 : 0.79;
+    var hoodPitch = carDef.id === 'lionceau_t16' || carDef.id === 'veltro_037' ? 0.085 : 0.045;
+    var hoodZ = carDef.id === 'lionceau_t16' ? -1.36 : (carDef.id === 'bergmeister_q85' ? -1.58 : -1.50);
+
+    var hoodMesh = new THREE.Mesh(new THREE.BoxGeometry(hoodW, 0.08, hoodLen), hoodMat);
+    hoodMesh.position.set(0, hoodY, hoodZ);
+    hoodMesh.rotation.x = hoodPitch;
     hoodMesh.receiveShadow = isHigh;
     rig.add(hoodMesh);
 
-    // Sculpted hood details per car model
+    // Sculpted hood aero, strakes, humps & intakes tailored per car model
     if (carDef.hoodStyle === 'quattro') {
-      var bulge = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.055, 0.88), hoodMat);
-      bulge.position.set(0, 0.835, -1.48);
-      bulge.rotation.x = 0.045;
+      var bulge = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.065, 0.96), hoodMat);
+      bulge.position.set(0, hoodY + 0.045, hoodZ + 0.04);
+      bulge.rotation.x = hoodPitch;
       rig.add(bulge);
     } else if (carDef.hoodStyle === 'r037') {
       [-0.36, 0.36].forEach(function (bx) {
-        var b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.92), bodyMat);
-        b.position.set(bx, 0.835, -1.48);
-        b.rotation.x = 0.045;
+        var b = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.96), bodyMat);
+        b.position.set(bx, hoodY + 0.04, hoodZ + 0.02);
+        b.rotation.x = hoodPitch;
         rig.add(b);
       });
-    } else if (carDef.hoodStyle === 't16' || carDef.hoodStyle === 's4') {
-      var vent = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.38), padMat);
-      vent.position.set(0, 0.835, -1.35);
-      vent.rotation.x = 0.045;
-      rig.add(vent);
+    } else if (carDef.hoodStyle === 't16') {
+      var extVent = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.04, 0.34), padMat);
+      extVent.position.set(0, hoodY + 0.04, hoodZ + 0.08);
+      extVent.rotation.x = hoodPitch;
+      rig.add(extVent);
+      // Signature E2 front fender strakes visible out ahead of A-pillars
+      [-0.78, 0.78].forEach(function (sx) {
+        var strake = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.16, 0.48), new THREE.MeshStandardMaterial({ color: new THREE.Color(carDef.accentPrimary), roughness: 0.4 }));
+        strake.position.set(sx, hoodY + 0.08, hoodZ - 0.10);
+        strake.rotation.x = hoodPitch;
+        rig.add(strake);
+      });
+    } else if (carDef.hoodStyle === 's4') {
+      var s4Vent = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.06, 0.46), padMat);
+      s4Vent.position.set(0, hoodY + 0.045, hoodZ + 0.12);
+      s4Vent.rotation.x = hoodPitch;
+      rig.add(s4Vent);
     }
 
-    // Hood pins & Quad rally light pod visible at front nose edge!
+    // Hood pins & Quad rally light pod visible at front nose edge
+    var noseEdgeZ = hoodZ - hoodLen * 0.45;
     [-0.65, 0.65].forEach(function (px) {
       var pin = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.025, 8), metalMat);
-      pin.position.set(px, 0.80, -2.02);
+      pin.position.set(px, hoodY + 0.01, noseEdgeZ + 0.10);
       rig.add(pin);
     });
+    var podRadius = carDef.id === 'veltro_037' ? 0.072 : 0.088;
     [-0.36, -0.12, 0.12, 0.36].forEach(function (lx) {
-      var podBump = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.095, 0.12, 10), padMat);
+      var podBump = new THREE.Mesh(new THREE.CylinderGeometry(podRadius, podRadius + 0.01, 0.12, 10), padMat);
       podBump.rotation.x = Math.PI / 2;
-      podBump.position.set(lx, 0.81, -2.14);
+      podBump.position.set(lx, hoodY - 0.01, noseEdgeZ - 0.02);
       rig.add(podBump);
     });
 
-    // Side fender edges visible near A-pillars
-    [-0.84, 0.84].forEach(function (fx) {
-      var fender = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 1.32), bodyMat);
-      fender.position.set(fx, 0.78, -1.48);
+    // Side fender edges matched to each car's trackWidth
+    [-hoodW * 0.5, hoodW * 0.5].forEach(function (fx) {
+      var fender = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, hoodLen), bodyMat);
+      fender.position.set(fx, hoodY - 0.01, hoodZ + 0.04);
+      fender.rotation.x = hoodPitch;
       rig.add(fender);
     });
 
@@ -846,31 +1040,31 @@ window.GroupBRally = window.GroupBRally || {};
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Redline zone arc
+    // Tick marks scaled cleanly to each car's redline (0..9 or 0..10 for 8800 RPM twincharger)
     var startA = Math.PI * 0.75;
     var endA = Math.PI * 2.25;
-    var redStart = startA + (endA - startA) * 0.82;
+    var maxTick = car.redlineRpm > 8500 ? 10 : 9;
+    var redStart = startA + (endA - startA) * ((car.redlineRpm * 0.86) / (maxTick * 1000));
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 9;
     ctx.beginPath();
     ctx.arc(cx, cy, r - 10, redStart, endA);
     ctx.stroke();
 
-    // Tick marks 0..9
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 15px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (var k = 0; k <= 9; k++) {
-      var a = startA + (endA - startA) * (k / 9);
+    for (var k = 0; k <= maxTick; k++) {
+      var a = startA + (endA - startA) * (k / maxTick);
       var tx = cx + Math.cos(a) * (r - 24);
       var ty = cy + Math.sin(a) * (r - 24);
-      ctx.fillStyle = k >= 8 ? '#f87171' : '#e2e8f0';
+      ctx.fillStyle = k >= maxTick - 1 ? '#f87171' : '#e2e8f0';
       ctx.fillText(String(k), tx, ty);
     }
 
     // RPM Needle
-    var rpmFrac = Math.max(0, Math.min(1.03, physState.rpm / (car.redlineRpm * 1.05)));
+    var rpmFrac = Math.max(0, Math.min(1.03, physState.rpm / (maxTick * 1000)));
     var needleA = startA + (endA - startA) * rpmFrac;
     ctx.strokeStyle = '#f97316';
     ctx.lineWidth = 5;
@@ -886,7 +1080,7 @@ window.GroupBRally = window.GroupBRally || {};
     ctx.fillStyle = shiftFlash ? '#ef4444' : '#331111';
     ctx.beginPath(); ctx.arc(cx, 18, 9, 0, Math.PI * 2); ctx.fill();
 
-    // Center Digital Gear & Speed
+    // Center Digital Gear & Speed + Spec Badge
     ctx.fillStyle = '#181c24';
     ctx.fillRect(216, 18, 120, 184);
     ctx.strokeStyle = '#334155';
@@ -904,14 +1098,15 @@ window.GroupBRally = window.GroupBRally || {};
     ctx.font = 'bold 40px monospace';
     ctx.fillText(String(spd), 276, 146);
     ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 14px monospace';
-    ctx.fillText(useMph ? 'MPH' : 'KM/H', 276, 178);
+    ctx.font = 'bold 13px monospace';
+    ctx.fillText((useMph ? 'MPH' : 'KM/H') + ' • ' + car.drivetrain, 276, 180);
 
-    // Right Pod: Boost Pressure Bar + Tyre Grip & Temp Telemetry
+    // Right Pod: Induction-Matched Boost Pressure Bar + Tyre Grip & Temp Telemetry
+    var indLabel = car.induction === 'SUPERCHARGER' ? 'SC ' : (car.induction === 'TWINCHARGED' ? 'TWIN ' : 'TURBO ');
     ctx.fillStyle = '#cbd5e1';
     ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('BOOST ' + physState.boost.toFixed(1) + ' BAR', 352, 34);
+    ctx.fillText(indLabel + physState.boost.toFixed(1) + ' BAR', 352, 34);
 
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(352, 44, 142, 22);
