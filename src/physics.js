@@ -161,25 +161,25 @@ window.GroupBRally = window.GroupBRally || {};
     if (this.speedKmh > this.topSpeedKmh) this.topSpeedKmh = this.speedKmh;
 
     // 2. Steering Physics (affected by car weight bias, tyre sidewall sharpness & speed)
-    var assistMode = this.settings.assists || 'low';
+    var assistMode = this.settings.assists || 'arcade';
     var isArcade = assistMode === 'arcade';
     var speedSteerLimit = isArcade
-      ? 1.0 / (1.0 + (speed / 44.0) * (speed / 44.0))
-      : 1.0 / (1.0 + (speed / 34.0) * (speed / 34.0));
-    var maxSteer = car.maxSteerAngle * ((isArcade ? 0.46 : 0.34) + (isArcade ? 0.54 : 0.66) * speedSteerLimit);
+      ? 1.0 / (1.0 + (speed / 58.0) * (speed / 58.0))
+      : 1.0 / (1.0 + (speed / 36.0) * (speed / 36.0));
+    var maxSteer = car.maxSteerAngle * ((isArcade ? 0.58 : 0.36) + (isArcade ? 0.42 : 0.64) * speedSteerLimit);
 
     // Automatic countersteer assist (strongest in Arcade, off in Pure Sim)
     var counterAssist = 0;
     if (assistMode !== 'off' && speed > 5) {
       var slipDir = Math.atan2(vRgt, Math.max(2, Math.abs(vFwd)));
-      var assistWeight = isArcade ? 0.72 : (assistMode === 'medium' ? 0.45 : 0.20);
-      var assistCap = isArcade ? 0.36 : 0.22;
+      var assistWeight = isArcade ? 0.80 : (assistMode === 'medium' ? 0.48 : 0.22);
+      var assistCap = isArcade ? 0.38 : 0.22;
       counterAssist = Math.max(-assistCap, Math.min(assistCap, slipDir * assistWeight));
     }
 
     var desiredSteer = input.steer * maxSteer * sens + counterAssist;
     desiredSteer = Math.max(-car.maxSteerAngle, Math.min(car.maxSteerAngle, desiredSteer));
-    var steerRate = car.steerSpeed * tyre.turnInSharpness * (1.05 - (car.massKg - 880) * 0.0005);
+    var steerRate = car.steerSpeed * tyre.turnInSharpness * (1.05 - (car.massKg - 880) * 0.0005) * (isArcade ? 1.45 : 1.0);
     this.steerAngle += (desiredSteer - this.steerAngle) * Math.min(1, dt * steerRate);
 
     // Visual steering wheel reflects driver steer + subtle self-aligning road kickback
@@ -297,7 +297,7 @@ window.GroupBRally = window.GroupBRally || {};
         if (vFwd < -0.5 && this.throttle > 0.1) {
           brakeForce = this.throttle * car.massKg * 14.0;
         } else {
-          brakeForce = this.brake * car.massKg * 13.8;
+          brakeForce = this.brake * car.massKg * (isArcade ? 16.5 : 13.8);
         }
       }
     }
@@ -305,7 +305,7 @@ window.GroupBRally = window.GroupBRally || {};
     // 5. Tyre Grip, Temperature, Wear & Weight Transfer Forces!
     var tyreGripMult = tyre.surfaceGrip[q.surfaceId] || 0.8;
     var offRoadFactor = q.offRoad > 0.05
-      ? Math.max(isArcade ? 0.85 : 0.55, 1.0 - q.offRoad * (isArcade ? 0.14 : 0.35))
+      ? Math.max(isArcade ? 0.92 : (assistMode === 'medium' ? 0.78 : 0.62), 1.0 - q.offRoad * (isArcade ? 0.08 : 0.30))
       : 1.0;
 
     // Tyre temp warms under lateral slip & braking, settles toward ambient
@@ -324,7 +324,11 @@ window.GroupBRally = window.GroupBRally || {};
 
     var mu = surf.baseGrip * tyreGripMult * offRoadFactor * tempMod * wearMod;
     if (isArcade) {
-      mu = Math.max(0.92, mu * 1.32);
+      mu = Math.max(1.55, mu * 1.85);
+    } else if (assistMode === 'medium') {
+      mu = Math.max(1.10, mu * 1.35);
+    } else if (assistMode === 'low') {
+      mu *= 1.15;
     }
     this.effectiveGrip = mu;
 
@@ -392,11 +396,11 @@ window.GroupBRally = window.GroupBRally || {};
       var maxDriveR = rearGripMax * 1.05;
       if (Math.abs(frontDrive) > maxDriveF) {
         frontDrive = Math.sign(frontDrive) * maxDriveF;
-        latForceF *= 0.72;
+        if (!isArcade) latForceF *= (assistMode === 'medium' ? 0.88 : 0.72);
       }
       if (Math.abs(rearDrive) > maxDriveR) {
         rearDrive = Math.sign(rearDrive) * maxDriveR;
-        latForceR *= 0.68; // Power oversteer on RWD / rear-biased AWD!
+        if (!isArcade) latForceR *= (assistMode === 'medium' ? 0.85 : 0.68); // Power oversteer on RWD / rear-biased AWD!
       }
 
       // Braking force split (62% front / 38% rear)
@@ -412,7 +416,7 @@ window.GroupBRally = window.GroupBRally || {};
       }
 
       // Rolling resistance + aerodynamic drag + off-road mud/snow drag
-      var offDrag = q.offRoad > 0.05 ? q.offRoad * 0.14 : 0;
+      var offDrag = q.offRoad > 0.05 ? q.offRoad * (isArcade ? 0.04 : 0.14) : 0;
       var rollDrag = (surf.rollingDrag + offDrag) * totalNormal * Math.sign(vFwd);
       var aeroDrag = 0.55 * vFwd * Math.abs(vFwd);
 
@@ -428,7 +432,7 @@ window.GroupBRally = window.GroupBRally || {};
       tauYaw = (-latForceF * lf + latForceR * lr);
 
       // Low-speed yaw damping & optional stability assist
-      var yawDamp = isArcade ? 0.45 : (assistMode === 'medium' ? 0.24 : (assistMode === 'low' ? 0.12 : 0.04));
+      var yawDamp = isArcade ? 0.22 : (assistMode === 'medium' ? 0.20 : (assistMode === 'low' ? 0.12 : 0.04));
       tauYaw -= this.yawRate * Iz * yawDamp * 8.0;
 
       // Apply accelerations in car frame, then transform to world
@@ -441,14 +445,16 @@ window.GroupBRally = window.GroupBRally || {};
       var newVRgt = vRgt + ayLocal * dt;
 
       if (isArcade) {
-        // Arcade auto-stabilization: car tracks cleanly where pointed, handbrake gives easy slide
-        newVRgt *= Math.max(0, 1 - dt * (this.handbrake ? 1.8 : 6.5));
+        // Arcade planted grip: strongly damps unwanted sideways slide unless handbraking
+        newVRgt *= Math.max(0, 1 - dt * (this.handbrake ? 2.2 : 10.5));
         // Subtle road-centering helper if drifting far off-road
         if (q.offRoad > 0.35 && speed > 4) {
           var signLat = q.lateral > 0 ? 1 : -1;
           this.vel.x -= q.right.x * signLat * 6.0 * dt;
           this.vel.z -= q.right.z * signLat * 6.0 * dt;
         }
+      } else if (assistMode === 'medium') {
+        newVRgt *= Math.max(0, 1 - dt * (this.handbrake ? 1.0 : 3.2));
       }
 
       // Gentle low-speed lateral settling so stopped car doesn't creep sideways
@@ -460,7 +466,13 @@ window.GroupBRally = window.GroupBRally || {};
       this.vel.z = newVFwd * fwdZ + newVRgt * rgtZ;
 
       this.yawRate += (tauYaw / Iz) * dt;
-      var maxYaw = isArcade ? 2.2 : 3.2;
+      if (isArcade && speed > 2) {
+        // Direct arcade cornering blend: car turns crisply with steering input
+        var arcadeYawTarget = -input.steer * sens * Math.min(2.3, 0.9 + speed * 0.045) * (vFwd >= 0 ? 1 : -1);
+        if (this.handbrake) arcadeYawTarget *= 1.35;
+        this.yawRate += (arcadeYawTarget - this.yawRate) * Math.min(1, dt * 8.5);
+      }
+      var maxYaw = isArcade ? 2.6 : 3.2;
       this.yawRate = Math.max(-maxYaw, Math.min(maxYaw, this.yawRate));
 
       this.slipIntensity = Math.min(1.5, (Math.abs(slipFront) + Math.abs(slipRear)) * 1.4 + (this.handbrake && speed > 4 ? 0.6 : 0));

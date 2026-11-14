@@ -15,7 +15,7 @@ window.GroupBRally = window.GroupBRally || {};
 
   var defaultSettings = {
     controlMode: 'auto',
-    assists: 'low',
+    assists: 'arcade',
     transmission: 'auto',
     steerSens: 1.0,
     fov: 68,
