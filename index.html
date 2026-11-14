@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>APEX GROUP B // 1986 WRC Rally Simulator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Fullscreen 3D WebGL Canvas (Garage Showcase in Menu, Cockpit POV in Stage) -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ==================== MAIN MENU OVERLAY ==================== -->
+  <div id="main-menu" class="menu-overlay">
+    <header class="menu-topbar">
+      <div class="brand-lockup">
+        <div class="rally-stripes">
+          <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+        </div>
+        <div>
+          <div class="brand-kicker">FIA HOMOLOGATION 1982–1986</div>
+          <h1 class="brand-title">APEX <span class="accent">GROUP B</span> RALLY</h1>
+        </div>
+      </div>
+
+      <nav class="menu-tabs">
+        <button class="tab-btn active" data-tab="stage-tab">01 // STAGE &amp; GARAGE</button>
+        <button class="tab-btn" data-tab="settings-tab">02 // SETTINGS &amp; CONTROLS</button>
+      </nav>
+    </header>
+
+    <main class="menu-body">
+      <!-- TAB 1: STAGE, CAR & TYRE SELECTION -->
+      <section id="stage-tab" class="tab-panel active">
+        <div class="menu-columns">
+          <!-- Left Column: Stage Select -->
+          <div class="panel-card">
+            <div class="panel-heading">
+              <span>SELECT SPECIAL STAGE</span>
+              <span class="badge-tag">3 BIOMES</span>
+            </div>
+            <div id="track-list" class="track-list"></div>
+
+            <div class="panel-heading mt-16">
+              <span>SELECT TYRE COMPOUND</span>
+              <span id="tyre-rec-badge" class="badge-tag">AFFECTS GRIP &amp; TURN-IN</span>
+            </div>
+            <div id="tyre-list" class="tyre-grid"></div>
+          </div>
+
+          <!-- Center Space lets 3D Turntable Car shine, with Bottom Car Selector Bar -->
+          <div class="showcase-column">
+            <div class="showcase-header">
+              <div>
+                <div id="car-era-label" class="car-era">1985 • GROUP B EVO 2</div>
+                <h2 id="car-name-label" class="car-name">BERGMEISTER Q85 S1</h2>
+              </div>
+              <div id="car-drivetrain-badge" class="drivetrain-pill">AWD • 1090 KG</div>
+            </div>
+
+            <div class="showcase-spacer">
+              <div class="turntable-hint">DRAG TO ROTATE 3D CAR • LIVE GARAGE PREVIEW</div>
+            </div>
+
+            <div class="panel-card car-specs-card">
+              <p id="car-summary" class="car-summary"></p>
+              <div class="spec-grid">
+                <div class="spec-row">
+                  <span>POWER / MASS</span>
+                  <div class="bar-track"><div id="stat-power" class="bar-fill"></div></div>
+                  <strong id="spec-power-val">540 HP</strong>
+                </div>
+                <div class="spec-row">
+                  <span>LIGHTNESS</span>
+                  <div class="bar-track"><div id="stat-weight" class="bar-fill"></div></div>
+                  <strong id="spec-weight-val">1090 KG</strong>
+                </div>
+                <div class="spec-row">
+                  <span>STEERING AGILITY</span>
+                  <div class="bar-track"><div id="stat-handling" class="bar-fill"></div></div>
+                  <strong id="spec-bias-val">56/44 F/R</strong>
+                </div>
+                <div class="spec-row">
+                  <span>STAGE GRIP MATCH</span>
+                  <div class="bar-track"><div id="stat-grip" class="bar-fill"></div></div>
+                  <strong id="spec-grip-val">OPTIMAL</strong>
+                </div>
+              </div>
+
+              <div id="car-list" class="car-selector-strip"></div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="menu-launch-bar">
+          <div class="selected-summary">
+            <div><span class="muted">STAGE:</span> <strong id="summary-track">OUNINPOHJA PINE RUN</strong></div>
+            <div><span class="muted">MACHINE:</span> <strong id="summary-car">BERGMEISTER Q85 S1</strong></div>
+            <div><span class="muted">TYRES:</span> <strong id="summary-tyre">GRAVEL ALL-TERRAIN</strong></div>
+            <div><span class="muted">BEST TIME:</span> <strong id="summary-best" class="gold-text">--:--.--</strong></div>
+          </div>
+          <button id="btn-start-stage" class="btn-launch">START SPECIAL STAGE ▶</button>
+        </footer>
+      </section>
+
+      <!-- TAB 2: SETTINGS & CONTROLS -->
+      <section id="settings-tab" class="tab-panel">
+        <div class="settings-grid">
+          <div class="panel-card">
+            <div class="panel-heading"><span>DRIVING PHYSICS &amp; ASSISTS</span></div>
+
+            <div class="setting-item">
+              <label for="set-control-mode">CONTROLS INPUT MODE</label>
+              <select id="set-control-mode">
+                <option value="auto" selected>AUTO DETECT (PC / PHONE)</option>
+                <option value="pc">PC CONTROLS (KEYBOARD)</option>
+                <option value="phone">PHONE CONTROLS (ON-SCREEN TOUCH)</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <label for="set-assists">DRIVING ASSISTS</label>
+              <select id="set-assists">
+                <option value="off">OFF — PURE GROUP B SIM</option>
+                <option value="low" selected>LOW — CLUBMAN RALLY (RECOMMENDED)</option>
+                <option value="medium">MEDIUM — COUNTERSTEER ASSIST</option>
+                <option value="arcade">ARCADE — EASY FOR EVERYONE (MAX ASSIST)</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <label for="set-trans">GEARBOX TRANSMISSION</label>
+              <select id="set-trans">
+                <option value="auto" selected>AUTOMATIC</option>
+                <option value="manual">MANUAL SEQUENTIAL (Q / E)</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <label for="set-steer-sens">STEERING SENSITIVITY (<span id="val-steer-sens">1.00</span>x)</label>
+              <input id="set-steer-sens" type="range" min="0.6" max="1.6" step="0.05" value="1.0" />
+            </div>
+
+            <div class="setting-item">
+              <label for="set-fov">COCKPIT CAMERA FOV (<span id="val-fov">68</span>°)</label>
+              <input id="set-fov" type="range" min="56" max="86" step="1" value="68" />
+            </div>
+
+            <div class="setting-item">
+              <label for="set-units">SPEEDOMETER UNITS</label>
+              <select id="set-units">
+                <option value="kmh" selected>KM/H (METRIC WRC)</option>
+                <option value="mph">MPH (IMPERIAL)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-heading"><span>GRAPHICS &amp; AUDIO</span></div>
+
+            <div class="setting-item">
+              <label for="set-quality">3D GRAPHICS QUALITY</label>
+              <select id="set-quality">
+                <option value="high" selected>HIGH — FULL FOREST &amp; SHADOWS</option>
+                <option value="medium">MEDIUM — BALANCED 60 FPS</option>
+                <option value="low">LOW — MAXIMUM PERFORMANCE</option>
+              </select>
+            </div>
+
+            <div class="setting-item">
+              <label for="set-master-vol">MASTER VOLUME (<span id="val-master-vol">75</span>%)</label>
+              <input id="set-master-vol" type="range" min="0" max="1" step="0.05" value="0.75" />
+            </div>
+
+            <div class="setting-item">
+              <label for="set-engine-vol">ENGINE &amp; TURBO FLUTTER (<span id="val-engine-vol">80</span>%)</label>
+              <input id="set-engine-vol" type="range" min="0" max="1" step="0.05" value="0.80" />
+            </div>
+
+            <div class="setting-item">
+              <label for="set-sfx-vol">SURFACE &amp; RADIO SFX (<span id="val-sfx-vol">85</span>%)</label>
+              <input id="set-sfx-vol" type="range" min="0" max="1" step="0.05" value="0.85" />
+            </div>
+
+            <div class="setting-item checkbox-row">
+              <label for="set-voice">CO-PILOT SPOKEN PACE NOTES (VOICE)</label>
+              <input id="set-voice" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-heading"><span>COCKPIT CONTROLS</span></div>
+            <div class="controls-list">
+              <div><kbd>W</kbd> / <kbd>↑</kbd><span>THROTTLE</span></div>
+              <div><kbd>S</kbd> / <kbd>↓</kbd><span>BRAKE / REVERSE</span></div>
+              <div><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd><span>STEERING &amp; COUNTERSTEER</span></div>
+              <div><kbd>SPACE</kbd><span>HANDBRAKE (HAIRPIN SLIDE)</span></div>
+              <div><kbd>E</kbd> / <kbd>Q</kbd><span>SHIFT UP / DOWN (MANUAL)</span></div>
+              <div><kbd>V</kbd><span>TOGGLE WINDSHIELD WIPERS</span></div>
+              <div><kbd>L</kbd><span>RALLY LIGHT POD BEAM</span></div>
+              <div><kbd>C</kbd><span>GLANCE CO-PILOT &amp; MAP SCREEN</span></div>
+              <div><kbd>R</kbd><span>RECOVER CAR TO ROAD</span></div>
+              <div><kbd>ESC</kbd><span>PAUSE / MENU</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ==================== IN-RACE MINIMAL RALLY OVERLAY ==================== -->
+  <!-- Note: Track Map & Gauges live physically INSIDE the 3D Car Cockpit! -->
+  <div id="race-overlay" class="race-overlay hidden">
+    <!-- Top-Center: Visual Radio Commands from Co-Pilot -->
+    <div id="radio-panel" class="radio-panel urgency-info">
+      <div class="radio-header">
+        <div class="radio-mic-dot"></div>
+        <span>CO-PILOT RADIO // INTERCOM CH.1</span>
+        <div class="radio-wave">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="radio-main">
+        <div id="radio-turn-icon" class="radio-turn-icon">
+          <!-- Crisp dynamic SVG turn arrow injected by JS -->
+        </div>
+        <div class="radio-call-text">
+          <div class="radio-top-line">
+            <span id="radio-grade-badge" class="grade-badge">GO</span>
+            <span id="radio-call-title" class="call-title">FLAT STRAIGHT</span>
+          </div>
+          <div class="radio-sub-line">
+            <span id="radio-extra-note" class="extra-note">PREPARE FOR LAUNCH</span>
+            <span id="radio-road-status" class="road-status status-ok">PACKED GRAVEL</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="radio-next-row" class="radio-next-row">
+        <span class="next-label">NEXT:</span>
+        <span id="radio-next-text">—</span>
+      </div>
+    </div>
+
+    <!-- Top-Right: Stage Timer, Target Pace & Sector Splits -->
+    <div class="timer-panel">
+      <div class="timer-stage-name" id="hud-stage-name">OUNINPOHJA PINE RUN</div>
+      <div class="timer-clock" id="hud-timer">00:00.00</div>
+      <div class="timer-meta">
+        <span>GOLD <strong id="hud-gold-target">01:32.00</strong></span>
+        <span>BEST <strong id="hud-best-time">--:--.--</strong></span>
+      </div>
+      <div id="sector-toast" class="sector-toast hidden"></div>
+    </div>
+
+    <!-- Center Start Countdown Lights / Banner -->
+    <div id="countdown-banner" class="countdown-banner hidden">
+      <div class="countdown-lights">
+        <span class="cd-light" id="cd-l1"></span>
+        <span class="cd-light" id="cd-l2"></span>
+        <span class="cd-light" id="cd-l3"></span>
+      </div>
+      <div id="countdown-text" class="countdown-text">3</div>
+    </div>
+
+    <!-- Bottom Subtle Key Hints (PC Mode) -->
+    <div id="pc-controls-strip" class="controls-strip">
+      <span><kbd>WASD</kbd> DRIVE</span>
+      <span><kbd>SPACE</kbd> HANDBRAKE</span>
+      <span><kbd>C</kbd> GLANCE CO-PILOT</span>
+      <span><kbd>V</kbd> WIPERS</span>
+      <span><kbd>L</kbd> LIGHTS</span>
+      <span><kbd>R</kbd> RECOVER</span>
+      <span><kbd>ESC</kbd> PAUSE</span>
+    </div>
+
+    <!-- Phone / Touch Controls Overlay (Shown automatically on Phone or when Phone Controls selected) -->
+    <div id="touch-action-pills" class="touch-action-pills hidden">
+      <button id="t-btn-glance" class="t-pill-btn" title="Glance Co-Pilot &amp; Map">👁</button>
+      <button id="t-btn-wipers" class="t-pill-btn" title="Wipers">💧</button>
+      <button id="t-btn-lights" class="t-pill-btn active" title="Lights">💡</button>
+      <button id="t-btn-recover" class="t-pill-btn" title="Recover">↺</button>
+      <button id="t-btn-pause" class="t-pill-btn" title="Pause">❚❚</button>
+    </div>
+
+    <div id="touch-controls-layer" class="touch-controls-layer hidden">
+      <div class="t-steer-zone">
+        <button id="t-pad-left" class="t-touch-btn t-steer-pad">◀</button>
+        <button id="t-pad-right" class="t-touch-btn t-steer-pad">▶</button>
+      </div>
+      <div class="t-pedals-zone">
+        <div class="t-aux-row">
+          <button id="t-pad-shift-down" class="t-touch-btn t-shift-pad hidden">−</button>
+          <button id="t-pad-shift-up" class="t-touch-btn t-shift-pad hidden">+</button>
+          <button id="t-pad-hb" class="t-touch-btn t-hb-pad">HANDBRAKE</button>
+        </div>
+        <div class="t-main-pedals">
+          <button id="t-pad-brake" class="t-touch-btn t-brake-pad">BRAKE<br/>REV</button>
+          <button id="t-pad-gas" class="t-touch-btn t-gas-pad">GAS</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAUSE MODAL ==================== -->
+  <div id="pause-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="rally-stripes small">
+        <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+      </div>
+      <h2>STAGE PAUSED</h2>
+      <p id="pause-stage-info" class="muted">OUNINPOHJA PINE RUN</p>
+      <div class="modal-actions">
+        <button id="btn-resume" class="btn-launch">RESUME STAGE</button>
+        <button id="btn-restart" class="btn-secondary">RESTART STAGE</button>
+        <button id="btn-quit-menu" class="btn-secondary">RETURN TO SERVICE PARK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STAGE FINISH RESULTS MODAL ==================== -->
+  <div id="finish-modal" class="modal-backdrop hidden">
+    <div class="modal-card finish-card">
+      <div class="rally-stripes small">
+        <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+      </div>
+      <div id="finish-medal-badge" class="finish-medal gold">GOLD STAGE TIME</div>
+      <h2 id="finish-stage-title">STAGE COMPLETE</h2>
+      <div class="finish-time-big" id="finish-total-time">01:31.42</div>
+      <div id="finish-pb-banner" class="pb-banner hidden">★ NEW PERSONAL STAGE RECORD! ★</div>
+
+      <div class="finish-stats-grid">
+        <div><span>SECTOR 1</span><strong id="fin-s1">--:--.--</strong></div>
+        <div><span>SECTOR 2</span><strong id="fin-s2">--:--.--</strong></div>
+        <div><span>TOP SPEED</span><strong id="fin-top-spd">172 KM/H</strong></div>
+        <div><span>MAX DRIFT</span><strong id="fin-drift">42°</strong></div>
+        <div><span>TYRE HEALTH</span><strong id="fin-tyre">94%</strong></div>
+        <div><span>OFF-TRACKS</span><strong id="fin-off">0</strong></div>
+      </div>
+
+      <div class="modal-actions horizontal">
+        <button id="btn-finish-retry" class="btn-secondary">RETRY STAGE</button>
+        <button id="btn-finish-next" class="btn-launch">NEXT STAGE ▶</button>
+        <button id="btn-finish-menu" class="btn-secondary">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts loaded in dependency order (works cleanly on both http:// and file://) -->
+  <script src="vendor/three.min.js"></script>
+  <script src="src/data.js"></script>
+  <script src="src/textures.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/tracks.js"></script>
+  <script src="src/carVisuals.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

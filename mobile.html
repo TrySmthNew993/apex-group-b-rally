@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>APEX GROUP B // Mobile Rally</title>
+  <link rel="stylesheet" href="mobile.css" />
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ==================== MOBILE MAIN MENU ==================== -->
+  <div id="main-menu" class="m-menu">
+    <header class="m-header">
+      <div class="m-brand">
+        <div class="m-stripes"><span class="s1"></span><span class="s2"></span><span class="s3"></span></div>
+        <div>
+          <div class="m-kicker">1986 GROUP B WRC</div>
+          <div class="m-title">APEX <span>GROUP B</span></div>
+        </div>
+      </div>
+      <div class="m-rotate-pill">↻ LANDSCAPE RECOMMENDED</div>
+    </header>
+
+    <div class="m-main-grid">
+      <div id="m-showcase-drag" class="m-showcase-area">
+        <div class="m-car-banner">
+          <div id="m-car-name" class="m-car-name">BERGMEISTER Q85 S1</div>
+          <div id="m-car-pill" class="m-car-pill">AWD • 1090 KG</div>
+        </div>
+        <div class="m-drag-hint">SWIPE TO SPIN 3D CAR</div>
+      </div>
+
+      <div class="m-sheet">
+      <div class="m-tabs">
+        <button class="m-tab active" data-tab="m-stage-panel">STAGE</button>
+        <button class="m-tab" data-tab="m-car-panel">CAR</button>
+        <button class="m-tab" data-tab="m-tyre-panel">TYRES</button>
+        <button class="m-tab" data-tab="m-settings-panel">SETTINGS</button>
+      </div>
+
+      <div class="m-tab-body">
+        <div id="m-stage-panel" class="m-panel active">
+          <div id="m-track-list" class="m-scroll-list"></div>
+        </div>
+
+        <div id="m-car-panel" class="m-panel">
+          <div id="m-car-list" class="m-scroll-list"></div>
+        </div>
+
+        <div id="m-tyre-panel" class="m-panel">
+          <div id="m-tyre-list" class="m-tyre-grid"></div>
+        </div>
+
+        <div id="m-settings-panel" class="m-panel">
+          <div class="m-setting-row">
+            <label for="m-control-mode">CONTROLS INPUT MODE</label>
+            <select id="m-control-mode">
+              <option value="auto" selected>AUTO DETECT (PC / PHONE)</option>
+              <option value="phone">PHONE CONTROLS (TOUCH)</option>
+              <option value="pc">PC CONTROLS (KEYBOARD)</option>
+            </select>
+          </div>
+
+          <div class="m-setting-row">
+            <label for="m-steer-mode">STEERING CONTROL</label>
+            <select id="m-steer-mode">
+              <option value="buttons" selected>TOUCH BUTTONS (◀ / ▶)</option>
+              <option value="tilt">TILT PHONE (GYROSCOPE)</option>
+            </select>
+          </div>
+
+          <div class="m-setting-row">
+            <label for="m-assists">DRIVING ASSISTS</label>
+            <select id="m-assists">
+              <option value="off">OFF — PURE GROUP B SIM</option>
+              <option value="low">LOW — CLUBMAN RALLY</option>
+              <option value="medium">MEDIUM — COUNTERSTEER ASSIST</option>
+              <option value="arcade" selected>ARCADE — EASY FOR EVERYONE (MAX ASSIST)</option>
+            </select>
+          </div>
+
+          <div class="m-setting-row">
+            <label for="m-trans">GEARBOX</label>
+            <select id="m-trans">
+              <option value="auto" selected>AUTOMATIC</option>
+              <option value="manual">MANUAL (+ / - BUTTONS)</option>
+            </select>
+          </div>
+
+          <div class="m-setting-row">
+            <label for="m-steer-sens">STEERING SENSITIVITY (<span id="m-val-sens">1.00</span>x)</label>
+            <input id="m-steer-sens" type="range" min="0.6" max="1.6" step="0.05" value="1.0" />
+          </div>
+
+          <div class="m-setting-row">
+            <label for="m-quality">3D GRAPHICS QUALITY</label>
+            <select id="m-quality">
+              <option value="high">HIGH — FULL DETAIL</option>
+              <option value="medium" selected>MEDIUM — SMOOTH 60 FPS (PHONE)</option>
+              <option value="low">LOW — BATTERY SAVER</option>
+            </select>
+          </div>
+
+          <div class="m-setting-row">
+            <label for="m-units">SPEED UNITS</label>
+            <select id="m-units">
+              <option value="kmh" selected>KM/H</option>
+              <option value="mph">MPH</option>
+            </select>
+          </div>
+
+          <div class="m-setting-row m-check-row">
+            <label for="m-voice">CO-PILOT VOICE NOTES</label>
+            <input id="m-voice" type="checkbox" checked />
+          </div>
+        </div>
+      </div>
+
+      <div class="m-launch-row">
+        <div class="m-summary-text">
+          <div id="m-sum-track"><strong>STAGE:</strong> OUNINPOHJA PINE RUN</div>
+          <div id="m-sum-best"><strong>BEST:</strong> --:--.-- • <span id="m-sum-tyre">GRAVEL</span></div>
+        </div>
+        <button id="m-btn-start" class="m-btn-start">START STAGE ▶</button>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== IN-RACE MOBILE HUD + TOUCH CONTROLS ==================== -->
+  <div id="race-overlay" class="m-race-overlay hidden">
+    <div class="m-top-bar">
+      <!-- Visual Radio Commands -->
+      <div id="radio-panel" class="m-radio urgency-info">
+        <div class="m-radio-head">
+          <span class="m-mic-dot"></span>
+          <span>CO-PILOT RADIO</span>
+        </div>
+        <div class="m-radio-body">
+          <div id="radio-turn-icon" class="m-radio-icon"></div>
+          <div>
+            <div class="m-radio-title">
+              <span id="radio-grade-badge" class="m-grade">GO</span>
+              <span id="radio-call-title">FLAT STRAIGHT</span>
+            </div>
+            <div class="m-status-row">
+              <span id="radio-extra-note" class="m-extra">LAUNCH</span>
+              <span id="radio-road-status" class="road-status status-ok">GRAVEL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timer + Quick Cockpit Action Pills -->
+      <div class="m-right-top">
+        <div class="m-timer-box">
+          <div class="m-timer-val" id="hud-timer">00:00.00</div>
+          <div class="m-timer-sub">GOLD <span id="hud-gold-target">01:32.00</span></div>
+        </div>
+        <div class="m-action-pills">
+          <button id="btn-glance" class="m-pill-btn" title="Glance Co-Pilot &amp; Map">👁</button>
+          <button id="btn-wipers" class="m-pill-btn" title="Wipers">💧</button>
+          <button id="btn-lights" class="m-pill-btn active" title="Lights">💡</button>
+          <button id="btn-recover" class="m-pill-btn" title="Recover">↺</button>
+          <button id="btn-pause" class="m-pill-btn" title="Pause">❚❚</button>
+        </div>
+        <div id="sector-toast" class="sector-toast hidden"></div>
+      </div>
+    </div>
+
+    <!-- Countdown Lights -->
+    <div id="countdown-banner" class="countdown-banner hidden">
+      <div class="countdown-lights">
+        <span class="cd-light" id="cd-l1"></span>
+        <span class="cd-light" id="cd-l2"></span>
+        <span class="cd-light" id="cd-l3"></span>
+      </div>
+      <div id="countdown-text" class="countdown-text">3</div>
+    </div>
+
+    <!-- Bottom Multi-Touch Driving Controls -->
+    <div class="m-controls-layer">
+      <div id="m-steer-zone" class="m-steer-zone">
+        <button id="pad-left" class="touch-btn steer-pad">◀</button>
+        <button id="pad-right" class="touch-btn steer-pad">▶</button>
+      </div>
+
+      <div class="m-pedals-zone">
+        <div class="m-aux-row">
+          <button id="pad-shift-down" class="touch-btn shift-pad hidden">−</button>
+          <button id="pad-shift-up" class="touch-btn shift-pad hidden">+</button>
+          <button id="pad-hb" class="touch-btn hb-pad">HANDBRAKE</button>
+        </div>
+        <div class="m-main-pedals">
+          <button id="pad-brake" class="touch-btn brake-pad">BRAKE<br/>REV</button>
+          <button id="pad-gas" class="touch-btn gas-pad">GAS</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAUSE & FINISH MODALS ==================== -->
+  <div id="pause-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h2>STAGE PAUSED</h2>
+      <p id="pause-stage-info" style="color:#94a3b8;font-size:13px;"></p>
+      <div class="modal-actions">
+        <button id="btn-resume" class="m-btn-start">RESUME STAGE</button>
+        <button id="btn-restart" class="btn-secondary">RESTART STAGE</button>
+        <button id="btn-quit-menu" class="btn-secondary">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="finish-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div id="finish-medal-badge" class="finish-medal gold">GOLD STAGE TIME</div>
+      <h2 id="finish-stage-title">STAGE COMPLETE</h2>
+      <div class="finish-time-big" id="finish-total-time">01:31.42</div>
+      <div id="finish-pb-banner" class="pb-banner hidden">★ NEW PERSONAL RECORD! ★</div>
+      <div class="finish-stats-grid">
+        <div><span>SECTOR 1</span><strong id="fin-s1">--:--.--</strong></div>
+        <div><span>SECTOR 2</span><strong id="fin-s2">--:--.--</strong></div>
+        <div><span>TOP SPEED</span><strong id="fin-top-spd">172 KM/H</strong></div>
+        <div><span>MAX DRIFT</span><strong id="fin-drift">42°</strong></div>
+        <div><span>TYRE HEALTH</span><strong id="fin-tyre">94%</strong></div>
+        <div><span>OFF-TRACKS</span><strong id="fin-off">0</strong></div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-finish-next" class="m-btn-start">NEXT STAGE ▶</button>
+        <button id="btn-finish-retry" class="btn-secondary">RETRY STAGE</button>
+        <button id="btn-finish-menu" class="btn-secondary">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="src/data.js"></script>
+  <script src="src/textures.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/tracks.js"></script>
+  <script src="src/carVisuals.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/mobile.js"></script>
+</body>
+</html>
