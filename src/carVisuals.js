@@ -230,9 +230,9 @@ window.GroupBRally = window.GroupBRally || {};
     // =========================================================================
     // 2. CABIN SHELL, ROLL CAGE, SUN-STRIP, MIRRORS & WINDSHIELD WIPERS
     // =========================================================================
-    // Main flocked dashboard slab
-    var mainDash = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.24, 0.56), dashMat);
-    mainDash.position.set(0, 0.76, -0.78);
+    // Main flocked dashboard slab (kept low & forward so it never occludes gauge/map screens)
+    var mainDash = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.20, 0.44), dashMat);
+    mainDash.position.set(0, 0.70, -0.84);
     rig.add(mainDash);
 
     // Lower center console tunnel between driver & co-pilot
@@ -340,17 +340,20 @@ window.GroupBRally = window.GroupBRally || {};
     var gaugeTex = new THREE.CanvasTexture(gaugeCanvas);
     gaugeTex.encoding = THREE.sRGBEncoding;
 
-    var binnacle = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.17, 0.16), padMat);
-    binnacle.position.set(-0.26, 0.90, -0.74);
-    rig.add(binnacle);
+    var gaugePod = new THREE.Group();
+    gaugePod.position.set(-0.26, 0.885, -0.75);
+    gaugePod.rotation.x = -0.10;
+
+    var binnacle = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.17, 0.14), padMat);
+    gaugePod.add(binnacle);
 
     var gaugePlane = new THREE.Mesh(
       new THREE.PlaneGeometry(0.39, 0.145),
       new THREE.MeshBasicMaterial({ map: gaugeTex })
     );
-    gaugePlane.position.set(-0.26, 0.90, -0.658);
-    gaugePlane.rotation.x = -0.12;
-    rig.add(gaugePlane);
+    gaugePlane.position.set(0, 0, 0.072);
+    gaugePod.add(gaugePlane);
+    rig.add(gaugePod);
 
     // =========================================================================
     // 4. STEERING WHEEL + DRIVER GLOVED HANDS (Rotates with steerAngle!)
@@ -408,7 +411,7 @@ window.GroupBRally = window.GroupBRally || {};
     // 5. PHYSICAL 3D IN-CAR TRACK MAP SCREEN (Part of the car, NOT HUD!)
     // =========================================================================
     var mapPod = new THREE.Group();
-    mapPod.position.set(0.07, 0.87, -0.68);
+    mapPod.position.set(0.08, 0.91, -0.66);
     mapPod.rotation.y = -0.34; // Angled naturally toward the driver!
     mapPod.rotation.x = -0.10;
 
@@ -456,7 +459,8 @@ window.GroupBRally = window.GroupBRally || {};
     // 6. 3D ANIMATED CO-PILOT NEXT TO YOU (Right Bucket Seat)
     // =========================================================================
     var coSeatGroup = new THREE.Group();
-    coSeatGroup.position.set(0.34, 0.44, -0.36);
+    coSeatGroup.position.set(0.40, 0.42, -0.32);
+    coSeatGroup.scale.set(0.74, 0.74, 0.74);
 
     // Sparco/Recaro Style Bucket Seat with Side Bolsters
     var seatMat = new THREE.MeshStandardMaterial({ color: 0x171717, roughness: 0.9 });
