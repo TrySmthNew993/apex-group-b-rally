@@ -154,6 +154,9 @@ window.GroupBRally = window.GroupBRally || {};
       profileY = [0.78, 0.08, 0.0, 0.06, 0.0, 0.08, 0.78];
     } else if (def.biome === 'jungle') {
       profileY = [0.55, -0.18, 0.0, 0.06, 0.0, -0.18, 0.55];
+    } else if (def.biome === 'tarmac' || def.biome === 'wet_tarmac') {
+      // Crisp crowned asphalt with shallow storm-drain verges
+      profileY = [0.34, -0.09, 0.0, 0.05, 0.0, -0.09, 0.34];
     }
     var cols = profileX.length;
 
@@ -165,14 +168,29 @@ window.GroupBRally = window.GroupBRally || {};
     var cRoadBase = new THREE.Color(def.roadColor);
     var cVerge = new THREE.Color(def.vergeColor);
     var cSnowBank = new THREE.Color('#eef5fc');
+    var cSnow = new THREE.Color('#ebf2fa');
+    var cTarmac = new THREE.Color('#7c8491');
+    var cWetTarmac = new THREE.Color('#5a6778');
     var cMud = new THREE.Color('#4f311b');
     var cPuddle = new THREE.Color('#27556b');
-    var cIce = new THREE.Color('#8ad8f0');
+    var cIce = new THREE.Color('#9be0f7');
     var cWood = new THREE.Color('#8f653a');
     var cSlush = new THREE.Color('#6f7e8c');
     var cDirt = new THREE.Color('#a3663c');
 
+    function getSurfaceMatIndex(surfId) {
+      if (surfId === 'tarmac') return 1;
+      if (surfId === 'wet_tarmac') return 2;
+      if (surfId === 'puddle' && def.biome === 'wet_tarmac') return 2;
+      if (surfId === 'snow' || surfId === 'slush') return 3;
+      if (surfId === 'ice') return 4;
+      return 0;
+    }
+
     var tmpColor = new THREE.Color();
+    var groups = [];
+    var curMatIdx = -1;
+    var curStart = 0;
 
     for (var i = 0; i < samples.length; i++) {
       var s = samples[i];
@@ -182,7 +200,10 @@ window.GroupBRally = window.GroupBRally || {};
 
       // Determine surface center color
       var surfColor = cRoadBase;
-      if (surfId === 'mud') surfColor = cMud;
+      if (surfId === 'tarmac') surfColor = cTarmac;
+      else if (surfId === 'wet_tarmac') surfColor = cWetTarmac;
+      else if (surfId === 'snow') surfColor = cSnow;
+      else if (surfId === 'mud') surfColor = cMud;
       else if (surfId === 'puddle') surfColor = cPuddle;
       else if (surfId === 'ice') surfColor = cIce;
       else if (surfId === 'wood') surfColor = cWood;
@@ -215,13 +236,25 @@ window.GroupBRally = window.GroupBRally || {};
       }
 
       if (i < samples.length - 1) {
+        var segMatIdx = getSurfaceMatIndex(surfId);
+        var idxStart = indices.length;
         var row0 = i * cols;
         var row1 = (i + 1) * cols;
         for (var c = 0; c < cols - 1; c++) {
           indices.push(row0 + c, row0 + c + 1, row1 + c);
           indices.push(row0 + c + 1, row1 + c + 1, row1 + c);
         }
+        if (segMatIdx !== curMatIdx) {
+          if (curMatIdx !== -1) {
+            groups.push({ start: curStart, count: idxStart - curStart, matIndex: curMatIdx });
+          }
+          curMatIdx = segMatIdx;
+          curStart = idxStart;
+        }
       }
+    }
+    if (curMatIdx !== -1 && indices.length > curStart) {
+      groups.push({ start: curStart, count: indices.length - curStart, matIndex: curMatIdx });
     }
 
     var geom = new THREE.BufferGeometry();
@@ -229,18 +262,56 @@ window.GroupBRally = window.GroupBRally || {};
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geom.setIndex(indices);
+    for (var g = 0; g < groups.length; g++) {
+      geom.addGroup(groups[g].start, groups[g].count, groups[g].matIndex);
+    }
     geom.computeVertexNormals();
 
-    var roadTex = G.createRoadTexture(def.biome);
-    var mat = new THREE.MeshStandardMaterial({
-      map: roadTex,
-      vertexColors: true,
-      roughness: def.biome === 'snow' ? 0.62 : 0.85,
-      metalness: 0.05,
-      side: THREE.DoubleSide
-    });
+    var baseMode = def.biome === 'jungle' ? 'jungle' : 'forest';
+    var materials = [
+      // 0: Dirt / Gravel / Mud / Timber
+      new THREE.MeshStandardMaterial({
+        map: G.createRoadTexture(baseMode),
+        vertexColors: true,
+        roughness: 0.88,
+        metalness: 0.04,
+        side: THREE.DoubleSide
+      }),
+      // 1: Dry Tarmac
+      new THREE.MeshStandardMaterial({
+        map: G.createRoadTexture('tarmac'),
+        vertexColors: true,
+        roughness: 0.72,
+        metalness: 0.08,
+        side: THREE.DoubleSide
+      }),
+      // 2: Wet Tarmac (low roughness for specular storm reflections)
+      new THREE.MeshStandardMaterial({
+        map: G.createRoadTexture('wet_tarmac'),
+        vertexColors: true,
+        roughness: 0.18,
+        metalness: 0.34,
+        side: THREE.DoubleSide
+      }),
+      // 3: Packed Snow / Slush
+      new THREE.MeshStandardMaterial({
+        map: G.createRoadTexture('snow'),
+        vertexColors: true,
+        roughness: 0.56,
+        metalness: 0.06,
+        side: THREE.DoubleSide
+      }),
+      // 4: Glazed Black Ice
+      new THREE.MeshStandardMaterial({
+        map: G.createRoadTexture('ice'),
+        vertexColors: true,
+        roughness: 0.14,
+        metalness: 0.28,
+        side: THREE.DoubleSide
+      })
+    ];
 
-    var mesh = new THREE.Mesh(geom, mat);
+    var mesh = new THREE.Mesh(geom, materials);
     mesh.receiveShadow = true;
     this.group.add(mesh);
   };
@@ -613,7 +684,8 @@ window.GroupBRally = window.GroupBRally || {};
   TrackInstance.prototype.buildBiomeProps = function () {
     var def = this.def;
     var samples = this.samples;
-    var rand = seededRandom(def.id === 'forest' ? 101 : (def.id === 'jungle' ? 202 : 303));
+    var seedMap = { forest: 101, jungle: 202, snow: 303, forest_sprint: 404, jungle_dash: 505, snow_ridge: 606, alpine_tarmac: 707, wet_tarmac_pass: 808 };
+    var rand = seededRandom(seedMap[def.id] || 909);
     var densityMult = this.quality === 'low' ? 0.5 : (this.quality === 'medium' ? 0.78 : 1.0);
 
     var dummy = new THREE.Object3D();
@@ -665,13 +737,19 @@ window.GroupBRally = window.GroupBRally || {};
     var treeTarget = Math.floor(950 * densityMult);
     var trunkGeom, crownGeom, trunkMat, crownMat, crown2Mat, crown2Geom;
 
-    if (def.biome === 'forest') {
+    if (def.biome === 'forest' || def.biome === 'tarmac' || def.biome === 'wet_tarmac') {
       trunkGeom = new THREE.CylinderGeometry(0.22, 0.36, 4.5, 6);
       trunkMat = new THREE.MeshStandardMaterial({ color: 0x4d3724, roughness: 0.95 });
       crownGeom = new THREE.ConeGeometry(2.7, 9.5, 7);
-      crownMat = new THREE.MeshStandardMaterial({ color: 0x264427, roughness: 0.9 });
+      crownMat = new THREE.MeshStandardMaterial({
+        color: def.biome === 'wet_tarmac' ? 0x1e3a28 : (def.biome === 'tarmac' ? 0x2d4f2c : 0x264427),
+        roughness: 0.9
+      });
       crown2Geom = new THREE.ConeGeometry(2.0, 6.2, 7);
-      crown2Mat = new THREE.MeshStandardMaterial({ color: 0x2f542e, roughness: 0.9 });
+      crown2Mat = new THREE.MeshStandardMaterial({
+        color: def.biome === 'wet_tarmac' ? 0x264b31 : (def.biome === 'tarmac' ? 0x386135 : 0x2f542e),
+        roughness: 0.9
+      });
     } else if (def.biome === 'jungle') {
       trunkGeom = new THREE.CylinderGeometry(0.18, 0.32, 9.0, 6);
       trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4632, roughness: 0.92 });
@@ -810,7 +888,7 @@ window.GroupBRally = window.GroupBRally || {};
    */
   TrackInstance.prototype.buildWeatherAndSpray = function () {
     var def = this.def;
-    var count = def.weatherType === 'snowfall' ? 700 : 320;
+    var count = def.weatherType === 'snowfall' ? 700 : (def.weatherType === 'mist_rain' ? 520 : (def.weatherType === 'clear' ? 120 : 320));
     var positions = new Float32Array(count * 3);
     for (var i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * 44;
@@ -820,10 +898,10 @@ window.GroupBRally = window.GroupBRally || {};
     var geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     var mat = new THREE.PointsMaterial({
-      color: def.weatherType === 'snowfall' ? 0xffffff : (def.weatherType === 'mist_rain' ? 0xcce8df : 0xf5e8c8),
-      size: def.weatherType === 'snowfall' ? 0.16 : 0.09,
+      color: def.weatherType === 'snowfall' ? 0xffffff : (def.weatherType === 'mist_rain' ? 0xdbeafe : 0xf5e8c8),
+      size: def.weatherType === 'snowfall' ? 0.16 : (def.weatherType === 'mist_rain' ? 0.11 : 0.08),
       transparent: true,
-      opacity: def.weatherType === 'snowfall' ? 0.82 : 0.38
+      opacity: def.weatherType === 'snowfall' ? 0.82 : (def.weatherType === 'mist_rain' ? 0.52 : (def.weatherType === 'clear' ? 0.14 : 0.38))
     });
     this.weatherSystem = new THREE.Points(geom, mat);
     this.group.add(this.weatherSystem);

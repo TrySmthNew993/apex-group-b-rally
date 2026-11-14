@@ -230,6 +230,14 @@ window.GroupBRally = window.GroupBRally || {};
       freq = 1200 + speedNorm * 650;
       q = 0.6;
       surfVol *= 1.5;
+    } else if (state.surfaceId === 'wet_tarmac') {
+      freq = 1480 + speedNorm * 600 + slipNorm * 400;
+      q = 0.9;
+      surfVol = (speedNorm * 0.16 + slipNorm * 0.24) * (state.airborne ? 0 : 1);
+    } else if (state.surfaceId === 'tarmac') {
+      freq = slipNorm > 0.22 ? (1900 + slipNorm * 950) : (620 + speedNorm * 240);
+      q = slipNorm > 0.22 ? 4.2 : 0.7;
+      surfVol = (speedNorm * 0.05 + slipNorm * 0.30) * (state.airborne ? 0 : 1);
     } else if (state.surfaceId === 'ice') {
       freq = 2100 + slipNorm * 900;
       q = 2.8;

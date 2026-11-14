@@ -88,10 +88,10 @@ window.GroupBRally = window.GroupBRally || {};
       shortLabel: 'SNOW',
       color: '#e2e8f0',
       badgeClass: 'status-ok',
-      baseGrip: 0.75,
-      rollingDrag: 0.036,
-      bumpAmp: 0.022,
-      bumpFreq: 1.6,
+      baseGrip: 0.80,
+      rollingDrag: 0.028,
+      bumpAmp: 0.018,
+      bumpFreq: 1.5,
       particleType: 'snow',
       particleColor: 0xf4f8ff
     },
@@ -101,9 +101,9 @@ window.GroupBRally = window.GroupBRally || {};
       shortLabel: 'SLUSH!',
       color: '#94a3b8',
       badgeClass: 'status-warn',
-      baseGrip: 0.56,
-      rollingDrag: 0.070,
-      bumpAmp: 0.03,
+      baseGrip: 0.62,
+      rollingDrag: 0.056,
+      bumpAmp: 0.026,
       bumpFreq: 1.8,
       particleType: 'water',
       particleColor: 0xcbd5e1
@@ -114,9 +114,9 @@ window.GroupBRally = window.GroupBRally || {};
       shortLabel: 'ICE!!',
       color: '#67e8f9',
       badgeClass: 'status-ice',
-      baseGrip: 0.34,
+      baseGrip: 0.42,
       rollingDrag: 0.008,
-      bumpAmp: 0.008,
+      bumpAmp: 0.006,
       bumpFreq: 1.2,
       particleType: 'snow',
       particleColor: 0xdff6ff
@@ -125,14 +125,27 @@ window.GroupBRally = window.GroupBRally || {};
       id: 'tarmac',
       label: 'DRY TARMAC',
       shortLabel: 'TARMAC',
-      color: '#64748b',
+      color: '#94a3b8',
       badgeClass: 'status-ok',
-      baseGrip: 1.08,
-      rollingDrag: 0.010,
-      bumpAmp: 0.010,
+      baseGrip: 1.16,
+      rollingDrag: 0.008,
+      bumpAmp: 0.006,
       bumpFreq: 2.0,
       particleType: 'none',
-      particleColor: 0x888888
+      particleColor: 0xd1d5db
+    },
+    wet_tarmac: {
+      id: 'wet_tarmac',
+      label: 'WET TARMAC',
+      shortLabel: 'WET TARMAC',
+      color: '#38bdf8',
+      badgeClass: 'status-warn',
+      baseGrip: 0.78,
+      rollingDrag: 0.016,
+      bumpAmp: 0.008,
+      bumpFreq: 1.7,
+      particleType: 'water',
+      particleColor: 0xcce8ff
     }
   };
 
@@ -160,14 +173,15 @@ window.GroupBRally = window.GroupBRally || {};
         snow: 0.72,
         slush: 0.76,
         ice: 0.45,
-        tarmac: 0.92
+        tarmac: 0.94,
+        wet_tarmac: 0.90
       }
     },
     {
       id: 'mud_wet',
       name: 'MONSOON DEEP-MUD',
       tag: 'WET / CLAY',
-      description: 'Tall self-cleaning blocks cut through thick mud & standing water; softer sidewall flex.',
+      description: 'Tall self-cleaning blocks cut through thick mud, wet tarmac & standing water; softer sidewall flex.',
       sidewallColor: '#38bdf8',
       slipPeak: 0.31, // ~17.8 deg
       turnInSharpness: 0.84,
@@ -182,14 +196,15 @@ window.GroupBRally = window.GroupBRally || {};
         snow: 0.82,
         slush: 1.10,
         ice: 0.50,
-        tarmac: 0.80
+        tarmac: 0.84,
+        wet_tarmac: 1.16
       }
     },
     {
       id: 'studded_snow',
       name: 'NORDIC 4MM STUDDED',
       tag: 'SNOW / ICE',
-      description: 'Tungsten studs bite deeply into packed snow & black ice. Skittish & wears fast on gravel.',
+      description: 'Tungsten studs bite deeply into packed snow & black ice. Skittish & wears fast on gravel or tarmac.',
       sidewallColor: '#7dd3fc',
       slipPeak: 0.25,
       turnInSharpness: 0.90,
@@ -201,17 +216,18 @@ window.GroupBRally = window.GroupBRally || {};
         mud: 0.68,
         puddle: 0.66,
         wood: 0.75,
-        snow: 1.22,
-        slush: 1.04,
+        snow: 1.24,
+        slush: 1.06,
         ice: 1.55,
-        tarmac: 0.70
+        tarmac: 0.72,
+        wet_tarmac: 0.68
       }
     },
     {
       id: 'tarmac_hard',
       name: 'RALLY SEMI-SLICK',
       tag: 'HARD COMPOUND',
-      description: 'Razor-sharp steering on firm surfaces, minimal slip margin. Deadly on mud, snow, or ice.',
+      description: 'Razor-sharp steering on dry tarmac, minimal slip margin. Slick on wet tarmac; deadly on mud, snow, or ice.',
       sidewallColor: '#ef4444',
       slipPeak: 0.16, // ~9 deg - snappy, unforgiving breakaway
       turnInSharpness: 1.16,
@@ -226,7 +242,8 @@ window.GroupBRally = window.GroupBRally || {};
         snow: 0.42,
         slush: 0.48,
         ice: 0.30,
-        tarmac: 1.20
+        tarmac: 1.24,
+        wet_tarmac: 0.74
       }
     }
   ];
@@ -455,17 +472,17 @@ window.GroupBRally = window.GroupBRally || {};
       ],
       surfaces: [
         { tStart: 0.00, tEnd: 0.21, type: 'gravel' },
-        { tStart: 0.21, tEnd: 0.35, type: 'dirt' },
+        { tStart: 0.21, tEnd: 0.35, type: 'tarmac' },
         { tStart: 0.35, tEnd: 0.45, type: 'mud' },
         { tStart: 0.45, tEnd: 0.52, type: 'wood' },
-        { tStart: 0.52, tEnd: 0.74, type: 'gravel' },
-        { tStart: 0.74, tEnd: 0.88, type: 'dirt' },
-        { tStart: 0.88, tEnd: 1.00, type: 'gravel' }
+        { tStart: 0.52, tEnd: 0.72, type: 'gravel' },
+        { tStart: 0.72, tEnd: 0.86, type: 'wet_tarmac' },
+        { tStart: 0.86, tEnd: 1.00, type: 'gravel' }
       ],
       specialCalls: [
-        { t: 0.24, note: 'CREST JUMP', status: 'BUMPY LANDING' },
+        { t: 0.20, note: 'ONTO TARMAC', status: 'HIGH GRIP' },
         { t: 0.43, note: 'NARROW BRIDGE', status: 'DON\'T CUT!' },
-        { t: 0.59, note: 'BIG CREST', status: 'KEEP CENTER' }
+        { t: 0.71, note: 'DAMP ASPHALT', status: 'WET TARMAC!' }
       ]
     },
     {
@@ -525,17 +542,18 @@ window.GroupBRally = window.GroupBRally || {};
         { tStart: 0.62, tEnd: 0.70, width: 7.0 }
       ],
       surfaces: [
-        { tStart: 0.00, tEnd: 0.17, type: 'dirt' },
-        { tStart: 0.17, tEnd: 0.33, type: 'mud' },
+        { tStart: 0.00, tEnd: 0.18, type: 'wet_tarmac' },
+        { tStart: 0.18, tEnd: 0.33, type: 'mud' },
         { tStart: 0.33, tEnd: 0.42, type: 'puddle' },
         { tStart: 0.42, tEnd: 0.61, type: 'dirt' },
         { tStart: 0.61, tEnd: 0.69, type: 'puddle' },
-        { tStart: 0.69, tEnd: 0.85, type: 'mud' },
-        { tStart: 0.85, tEnd: 1.00, type: 'dirt' }
+        { tStart: 0.69, tEnd: 0.85, type: 'wet_tarmac' },
+        { tStart: 0.85, tEnd: 1.00, type: 'mud' }
       ],
       specialCalls: [
+        { t: 0.17, note: 'OFF TARMAC TO MUD', status: 'SLIPPERY!' },
         { t: 0.31, note: 'WATERSPLASH', status: 'DEEP PUDDLE!' },
-        { t: 0.59, note: 'WATERSPLASH', status: 'AQUAPLANE RISK' }
+        { t: 0.68, note: 'WET ASPHALT CLIMB', status: 'SLICK TARMAC!' }
       ]
     },
     {
@@ -544,7 +562,7 @@ window.GroupBRally = window.GroupBRally || {};
       country: 'MONTE CARLO / SWEDEN',
       biome: 'snow',
       biomeLabel: 'ALPINE SNOW & ICE',
-      description: 'Treacherous high-altitude winter mountain pass lined with snowbanks, blinding snow flurries, frozen switchbacks, and lethal black ice.',
+      description: 'Treacherous high-altitude winter mountain pass mixing packed snow, wet alpine tarmac switchbacks, slushy valleys, and lethal black ice.',
       recommendedTyre: 'studded_snow',
       defaultWidth: 8.4,
       targetTimes: { gold: 90, silver: 104, bronze: 120 },
@@ -592,16 +610,16 @@ window.GroupBRally = window.GroupBRally || {};
         { tStart: 0.25, tEnd: 0.36, width: 7.4 }
       ],
       surfaces: [
-        { tStart: 0.00, tEnd: 0.20, type: 'snow' },
-        { tStart: 0.20, tEnd: 0.36, type: 'ice' },
-        { tStart: 0.36, tEnd: 0.54, type: 'snow' },
+        { tStart: 0.00, tEnd: 0.18, type: 'wet_tarmac' },
+        { tStart: 0.18, tEnd: 0.34, type: 'ice' },
+        { tStart: 0.34, tEnd: 0.54, type: 'snow' },
         { tStart: 0.54, tEnd: 0.67, type: 'slush' },
-        { tStart: 0.67, tEnd: 0.83, type: 'ice' },
-        { tStart: 0.83, tEnd: 1.00, type: 'snow' }
+        { tStart: 0.67, tEnd: 0.82, type: 'ice' },
+        { tStart: 0.82, tEnd: 1.00, type: 'snow' }
       ],
       specialCalls: [
-        { t: 0.19, note: 'HAIRPINS ON ICE', status: 'BLACK ICE!' },
-        { t: 0.45, note: 'SUMMIT CREST', status: 'DROP DOWN' },
+        { t: 0.17, note: 'HAIRPINS ON ICE', status: 'BLACK ICE!' },
+        { t: 0.35, note: 'PACKED SNOW', status: 'SNOW COVER' },
         { t: 0.66, note: 'ICY CHICANE', status: 'BLACK ICE!' }
       ]
     },
@@ -611,7 +629,7 @@ window.GroupBRally = window.GroupBRally || {};
       country: 'FINLAND • SIMPLE',
       biome: 'forest',
       biomeLabel: 'FOREST (SIMPLE)',
-      description: 'Wide, fast-flowing clubman forest stage with 3 clean grade 1–3 turns, grippy packed gravel, and zero tight hairpins.',
+      description: 'Wide, fast-flowing clubman stage mixing grippy dry tarmac with packed forest gravel across 3 clean grade 1–3 turns.',
       recommendedTyre: 'gravel_soft',
       defaultWidth: 10.0,
       targetTimes: { gold: 52, silver: 62, bronze: 74 },
@@ -645,12 +663,12 @@ window.GroupBRally = window.GroupBRally || {};
       ],
       widthOverrides: [],
       surfaces: [
-        { tStart: 0.00, tEnd: 0.45, type: 'gravel' },
-        { tStart: 0.45, tEnd: 0.70, type: 'dirt' },
-        { tStart: 0.70, tEnd: 1.00, type: 'gravel' }
+        { tStart: 0.00, tEnd: 0.38, type: 'gravel' },
+        { tStart: 0.38, tEnd: 0.72, type: 'tarmac' },
+        { tStart: 0.72, tEnd: 1.00, type: 'gravel' }
       ],
       specialCalls: [
-        { t: 0.55, note: 'LOOSE GRAVEL SECTION', status: 'WIDE ROAD' }
+        { t: 0.37, note: 'TARMAC SECTION', status: 'HIGH GRIP' }
       ]
     },
     {
@@ -659,7 +677,7 @@ window.GroupBRally = window.GroupBRally || {};
       country: 'BORNEO • SIMPLE',
       biome: 'jungle',
       biomeLabel: 'JUNGLE (SIMPLE)',
-      description: 'Wide red-clay rainforest sprint with 3 smooth medium bends, gentle rolling hills, and one shallow creek splash.',
+      description: 'Wide tropical sprint combining rain-slicked wet tarmac, red-clay dirt, and one shallow creek splash across 3 smooth bends.',
       recommendedTyre: 'mud_wet',
       defaultWidth: 9.6,
       targetTimes: { gold: 54, silver: 64, bronze: 76 },
@@ -692,13 +710,13 @@ window.GroupBRally = window.GroupBRally || {};
       ],
       widthOverrides: [],
       surfaces: [
-        { tStart: 0.00, tEnd: 0.42, type: 'dirt' },
-        { tStart: 0.42, tEnd: 0.52, type: 'puddle' },
-        { tStart: 0.52, tEnd: 0.78, type: 'mud' },
-        { tStart: 0.78, tEnd: 1.00, type: 'dirt' }
+        { tStart: 0.00, tEnd: 0.38, type: 'wet_tarmac' },
+        { tStart: 0.38, tEnd: 0.48, type: 'puddle' },
+        { tStart: 0.48, tEnd: 0.78, type: 'dirt' },
+        { tStart: 0.78, tEnd: 1.00, type: 'wet_tarmac' }
       ],
       specialCalls: [
-        { t: 0.40, note: 'WATERSPLASH', status: 'KEEP STRAIGHT' }
+        { t: 0.37, note: 'WATERSPLASH', status: 'WET TARMAC!' }
       ]
     },
     {
@@ -707,7 +725,7 @@ window.GroupBRally = window.GroupBRally || {};
       country: 'SWEDEN • SIMPLE',
       biome: 'snow',
       biomeLabel: 'SNOW (SIMPLE)',
-      description: 'Wide snow-packed alpine sprint with 3 clean grade 1–3 bends and cushioned snowbanks—ideal for learning winter drifts.',
+      description: 'Wide snow-packed alpine sprint with crisp snowbanks, slushy valley dips, and a cold black-ice sweep—ideal for learning winter drifts.',
       recommendedTyre: 'studded_snow',
       defaultWidth: 9.8,
       targetTimes: { gold: 56, silver: 66, bronze: 78 },
@@ -740,12 +758,127 @@ window.GroupBRally = window.GroupBRally || {};
       ],
       widthOverrides: [],
       surfaces: [
-        { tStart: 0.00, tEnd: 0.48, type: 'snow' },
-        { tStart: 0.48, tEnd: 0.65, type: 'slush' },
-        { tStart: 0.65, tEnd: 1.00, type: 'snow' }
+        { tStart: 0.00, tEnd: 0.42, type: 'snow' },
+        { tStart: 0.42, tEnd: 0.62, type: 'slush' },
+        { tStart: 0.62, tEnd: 0.78, type: 'ice' },
+        { tStart: 0.78, tEnd: 1.00, type: 'snow' }
       ],
       specialCalls: [
-        { t: 0.46, note: 'SUMMIT SLUSH', status: 'PACKED SNOW' }
+        { t: 0.41, note: 'SLUSH VALLEY', status: 'KEEP SMOOTH' },
+        { t: 0.61, note: 'ICY SWEEP', status: 'BLACK ICE!' }
+      ]
+    },
+    {
+      id: 'alpine_tarmac',
+      name: 'TOUR DE CORSE ASPHALT',
+      country: 'FRANCE • TARMAC',
+      biome: 'tarmac',
+      biomeLabel: 'DRY TARMAC',
+      description: 'Pure high-grip mountain asphalt ribbons with crisp road markings, fast elevation sweepers, and flat-out Group B tarmac hairpins.',
+      recommendedTyre: 'tarmac_hard',
+      defaultWidth: 8.8,
+      targetTimes: { gold: 78, silver: 90, bronze: 105 },
+      skyTop: 0x2563eb,
+      skyHorizon: 0xdbeafe,
+      fogColor: 0xcbd5e1,
+      fogDensity: 0.0018,
+      sunColor: 0xfff5db,
+      sunIntensity: 1.35,
+      ambientColor: 0x738294,
+      groundColor: '#4b5b3c',
+      roadColor: '#64748b',
+      vergeColor: '#566349',
+      weatherType: 'clear',
+      points: [
+        [0, 0, 0],
+        [0, 1.0, -90],
+        [15, 3.0, -185],
+        [65, 6.0, -270],
+        [145, 8.5, -335],
+        [240, 9.0, -370],
+        [335, 7.0, -405],
+        [395, 4.5, -475],
+        [380, 3.0, -560],
+        [315, 2.5, -605],
+        [255, 2.0, -575],
+        [215, 2.5, -640],
+        [245, 4.0, -730],
+        [325, 6.5, -805],
+        [420, 8.5, -860],
+        [510, 7.0, -920],
+        [560, 4.0, -1005],
+        [530, 2.0, -1095],
+        [465, 1.5, -1165],
+        [435, 2.0, -1255],
+        [465, 3.0, -1350],
+        [535, 3.5, -1435]
+      ],
+      widthOverrides: [],
+      surfaces: [
+        { tStart: 0.00, tEnd: 1.00, type: 'tarmac' }
+      ],
+      specialCalls: [
+        { t: 0.30, note: 'FAST ASPHALT SWEEPERS', status: 'DRY TARMAC' },
+        { t: 0.65, note: 'DOWNHILL CHICANE', status: 'BRAKE LATE!' }
+      ]
+    },
+    {
+      id: 'wet_tarmac_pass',
+      name: 'SANREMO STORM PASS',
+      country: 'ITALY • WET TARMAC',
+      biome: 'wet_tarmac',
+      biomeLabel: 'WET TARMAC',
+      description: 'Rain-lashed mountain tarmac gleaming under storm clouds, with slick wet asphalt, brief dry tunnel relief, and standing drainage splashes.',
+      recommendedTyre: 'mud_wet',
+      defaultWidth: 8.6,
+      targetTimes: { gold: 82, silver: 95, bronze: 112 },
+      skyTop: 0x334155,
+      skyHorizon: 0x94a3b8,
+      fogColor: 0x7c8ea3,
+      fogDensity: 0.0032,
+      sunColor: 0xdbeafe,
+      sunIntensity: 1.05,
+      ambientColor: 0x64748b,
+      groundColor: '#364438',
+      roadColor: '#475569',
+      vergeColor: '#3f4f42',
+      weatherType: 'mist_rain',
+      points: [
+        [0, 0, 0],
+        [0, 0.5, -85],
+        [-20, 2.0, -175],
+        [-75, 4.5, -255],
+        [-155, 6.5, -315],
+        [-245, 6.0, -355],
+        [-315, 3.5, -415],
+        [-335, 1.5, -500],
+        [-295, 1.0, -580],
+        [-230, 1.5, -610],
+        [-180, 2.0, -570],
+        [-155, 2.5, -645],
+        [-195, 4.0, -735],
+        [-275, 5.5, -805],
+        [-365, 5.0, -860],
+        [-430, 3.0, -935],
+        [-425, 1.5, -1030],
+        [-375, 1.0, -1115],
+        [-345, 1.5, -1205],
+        [-370, 2.0, -1300],
+        [-425, 2.5, -1390]
+      ],
+      widthOverrides: [],
+      surfaces: [
+        { tStart: 0.00, tEnd: 0.36, type: 'wet_tarmac' },
+        { tStart: 0.36, tEnd: 0.44, type: 'puddle' },
+        { tStart: 0.44, tEnd: 0.58, type: 'tarmac' },
+        { tStart: 0.58, tEnd: 0.80, type: 'wet_tarmac' },
+        { tStart: 0.80, tEnd: 0.86, type: 'puddle' },
+        { tStart: 0.86, tEnd: 1.00, type: 'wet_tarmac' }
+      ],
+      specialCalls: [
+        { t: 0.35, note: 'STANDING WATER', status: 'WET TARMAC!' },
+        { t: 0.44, note: 'GRIPPY DRY PATCH', status: 'TARMAC' },
+        { t: 0.79, note: 'STORM DRAINAGE', status: 'WATERSPLASH!' }
       ]
     }
   ];

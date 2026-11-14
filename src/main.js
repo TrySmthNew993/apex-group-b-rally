@@ -39,6 +39,14 @@ window.GroupBRally = window.GroupBRally || {};
     return detectIsMobile();
   }
 
+  function getBaseFov() {
+    var aspect = window.innerWidth / Math.max(1, window.innerHeight);
+    if (aspect < 1.0) {
+      return Math.min(104, Math.round(settings.fov / Math.max(0.55, aspect * 1.15)));
+    }
+    return settings.fov;
+  }
+
   var settings = loadJSON(STORAGE_SETTINGS, defaultSettings);
   var records = loadJSON(STORAGE_RECORDS, {});
 
@@ -285,7 +293,10 @@ window.GroupBRally = window.GroupBRally || {};
     document.getElementById('spec-bias-val').textContent = fPct + '/' + (100 - fPct) + ' F/R';
 
     // Compute stage tyre grip match score
-    var dominantSurf = track.biome === 'snow' ? 'snow' : (track.biome === 'jungle' ? 'mud' : 'gravel');
+    var dominantSurf = track.biome === 'snow' ? 'snow'
+      : (track.biome === 'jungle' ? 'mud'
+      : (track.biome === 'tarmac' ? 'tarmac'
+      : (track.biome === 'wet_tarmac' ? 'wet_tarmac' : 'gravel')));
     var matchScore = Math.round(Math.min(100, (tyre.surfaceGrip[dominantSurf] || 0.8) * 78));
     document.getElementById('stat-grip').style.width = matchScore + '%';
     document.getElementById('spec-grip-val').textContent = matchScore >= 82 ? 'OPTIMAL' : (matchScore >= 65 ? 'FAIR' : 'RISKY!');
@@ -491,7 +502,7 @@ window.GroupBRally = window.GroupBRally || {};
     carPivot.add(raceCamera);
     raceScene.add(carPivot);
 
-    raceCamera.fov = settings.fov;
+    raceCamera.fov = getBaseFov();
     raceCamera.updateProjectionMatrix();
 
     // Initialize Physics
@@ -758,6 +769,7 @@ window.GroupBRally = window.GroupBRally || {};
     menuCamera.aspect = w / h;
     menuCamera.updateProjectionMatrix();
     raceCamera.aspect = w / h;
+    raceCamera.fov = getBaseFov();
     raceCamera.updateProjectionMatrix();
   });
 
@@ -895,7 +907,7 @@ window.GroupBRally = window.GroupBRally || {};
     raceCamera.rotation.z = -phys.latG * 0.014;
 
     // Subtle speed FOV punch
-    var desiredFov = settings.fov + Math.min(7, phys.speedKmh * 0.038);
+    var desiredFov = getBaseFov() + Math.min(7, phys.speedKmh * 0.038);
     if (Math.abs(raceCamera.fov - desiredFov) > 0.1) {
       raceCamera.fov += (desiredFov - raceCamera.fov) * Math.min(1, dt * 6);
       raceCamera.updateProjectionMatrix();

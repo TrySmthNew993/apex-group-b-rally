@@ -28,34 +28,119 @@ window.GroupBRally = window.GroupBRally || {};
   }
 
   /**
-   * Generates a tileable rally road texture with worn twin tyre tracks,
-   * center crown, and gritty micro-detail for high speed perception.
-   * Because vertex colors multiply with this map, base brightness is kept neutral-bright.
+   * Generates a tileable rally road texture.
+   * Supports surface modes: 'tarmac', 'wet_tarmac', 'snow', 'ice', 'forest', 'jungle'.
    */
-  G.createRoadTexture = function (biome) {
+  G.createRoadTexture = function (mode) {
     var w = 512, h = 512;
     var c = makeCanvas(w, h);
     var ctx = c.getContext('2d');
 
-    // Neutral bright base so vertex colors (gravel/mud/puddle/ice/snow) tint cleanly
-    ctx.fillStyle = biome === 'snow' ? '#e8eef5' : '#d2c9bc';
+    var isTarmac = mode === 'tarmac';
+    var isWetTarmac = mode === 'wet_tarmac';
+    var isIce = mode === 'ice';
+    var isSnow = mode === 'snow' || isIce;
+
+    var seed = mode === 'forest' ? 1337
+      : (mode === 'jungle' ? 4242
+      : (isTarmac ? 6101
+      : (isWetTarmac ? 7202
+      : (isIce ? 8303 : 9001))));
+    function rand() {
+      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+      return ((seed >>> 0) / 4294967296);
+    }
+
+    if (isTarmac || isWetTarmac) {
+      // Base neutral-slate so vertex tint renders realistic dry/wet asphalt while keeping lines crisp
+      ctx.fillStyle = isWetTarmac ? '#8a95a3' : '#b2b9c2';
+      ctx.fillRect(0, 0, w, h);
+
+      // Subtle shoulder darkening outside the painted asphalt edges
+      var leftGrad = ctx.createLinearGradient(0, 0, w * 0.32, 0);
+      leftGrad.addColorStop(0, 'rgba(20,25,30,0.55)');
+      leftGrad.addColorStop(1, 'rgba(20,25,30,0.08)');
+      ctx.fillStyle = leftGrad;
+      ctx.fillRect(0, 0, w * 0.32, h);
+
+      var rightGrad = ctx.createLinearGradient(w * 0.68, 0, w, 0);
+      rightGrad.addColorStop(0, 'rgba(20,25,30,0.08)');
+      rightGrad.addColorStop(1, 'rgba(20,25,30,0.55)');
+      ctx.fillStyle = rightGrad;
+      ctx.fillRect(w * 0.68, 0, w * 0.32, h);
+
+      // Subtle dark rubber / water-sheen racing lines
+      var trackPositions = [w * 0.42, w * 0.58];
+      for (var tp = 0; tp < trackPositions.length; tp++) {
+        var tx = trackPositions[tp];
+        var tg = ctx.createLinearGradient(tx - 32, 0, tx + 32, 0);
+        tg.addColorStop(0, 'rgba(0,0,0,0)');
+        tg.addColorStop(0.5, isWetTarmac ? 'rgba(15,28,44,0.46)' : 'rgba(28,32,38,0.28)');
+        tg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = tg;
+        ctx.fillRect(tx - 32, 0, 64, h);
+      }
+
+      // Fine asphalt mineral aggregate speckles
+      for (var i = 0; i < 6500; i++) {
+        var x = rand() * w;
+        var y = rand() * h;
+        var sz = 1 + rand() * 2.1;
+        var bright = rand() > 0.48;
+        ctx.fillStyle = bright
+          ? 'rgba(255,255,255,' + (isWetTarmac ? (0.06 + rand() * 0.14) : (0.07 + rand() * 0.12)).toFixed(2) + ')'
+          : 'rgba(15,18,22,' + (0.10 + rand() * 0.18).toFixed(2) + ')';
+        ctx.fillRect(x, y, sz, sz);
+      }
+
+      if (isWetTarmac) {
+        // Longitudinal water film & specular rain streaks
+        for (var ws = 0; ws < 90; ws++) {
+          var wx = w * 0.33 + rand() * w * 0.34;
+          var wy = rand() * h;
+          var wh = 30 + rand() * 90;
+          ctx.fillStyle = rand() > 0.45
+            ? 'rgba(186,230,253,' + (0.10 + rand() * 0.16).toFixed(2) + ')'
+            : 'rgba(15,23,42,' + (0.14 + rand() * 0.16).toFixed(2) + ')';
+          ctx.fillRect(wx, wy, 2 + rand() * 6, wh);
+        }
+      }
+
+      // Crisp solid white road edge lines right at u=0.333 and u=0.667
+      ctx.fillStyle = isWetTarmac ? 'rgba(226,232,240,0.82)' : 'rgba(248,250,252,0.92)';
+      ctx.fillRect(w * 0.333 - 4, 0, 8, h);
+      ctx.fillRect(w * 0.667 - 4, 0, 8, h);
+
+      // Dashed yellow/white rally centerline (4 dashes per tile so it loops seamlessly)
+      ctx.fillStyle = isWetTarmac ? 'rgba(250,204,21,0.72)' : 'rgba(250,204,21,0.88)';
+      for (var d = 0; d < 4; d++) {
+        ctx.fillRect(w * 0.5 - 3, d * 128 + 16, 6, 72);
+      }
+
+      return makeTexture(c, 1, 1, true);
+    }
+
+    // Snow / Ice / Dirt / Gravel base
+    ctx.fillStyle = isIce ? '#cfe7fb' : (isSnow ? '#edf3fa' : '#d2c9bc');
     ctx.fillRect(0, 0, w, h);
 
     // Subtle verge shading on far left and right edges
     var leftGrad = ctx.createLinearGradient(0, 0, 80, 0);
-    leftGrad.addColorStop(0, 'rgba(30,28,24,0.45)');
+    leftGrad.addColorStop(0, isSnow ? 'rgba(110,138,170,0.36)' : 'rgba(30,28,24,0.45)');
     leftGrad.addColorStop(1, 'rgba(30,28,24,0)');
     ctx.fillStyle = leftGrad;
     ctx.fillRect(0, 0, 80, h);
 
     var rightGrad = ctx.createLinearGradient(w - 80, 0, w, 0);
     rightGrad.addColorStop(0, 'rgba(30,28,24,0)');
-    rightGrad.addColorStop(1, 'rgba(30,28,24,0.45)');
+    rightGrad.addColorStop(1, isSnow ? 'rgba(110,138,170,0.36)' : 'rgba(30,28,24,0.45)');
     ctx.fillStyle = rightGrad;
     ctx.fillRect(w - 80, 0, 80, h);
 
     // Twin worn rally tyre tracks inside the road surface (u = 0.33..0.67 is drivable road)
-    var rutColor = biome === 'snow' ? 'rgba(95,120,150,0.48)' : 'rgba(48,34,22,0.42)';
+    var rutColor = isIce
+      ? 'rgba(56,130,185,0.44)'
+      : (isSnow ? 'rgba(85,115,150,0.46)' : 'rgba(48,34,22,0.42)');
     var rutPositions = [w * 0.43, w * 0.57];
     for (var r = 0; r < rutPositions.length; r++) {
       var rx = rutPositions[r];
@@ -68,20 +153,13 @@ window.GroupBRally = window.GroupBRally || {};
     }
 
     // Clear road-edge boundary contrast lines right at u=0.333 and u=0.667
-    ctx.fillStyle = biome === 'snow' ? 'rgba(255,255,255,0.65)' : 'rgba(245,236,216,0.48)';
+    ctx.fillStyle = isSnow ? 'rgba(255,255,255,0.78)' : 'rgba(245,236,216,0.48)';
     ctx.fillRect(w * 0.33 - 4, 0, 8, h);
     ctx.fillRect(w * 0.67 - 4, 0, 8, h);
 
     // Center loose crest line
-    ctx.fillStyle = biome === 'snow' ? 'rgba(255,255,255,0.28)' : 'rgba(255,245,225,0.16)';
+    ctx.fillStyle = isSnow ? 'rgba(255,255,255,0.32)' : 'rgba(255,245,225,0.16)';
     ctx.fillRect(w * 0.45, 0, w * 0.10, h);
-
-    // Gravel / stone / ice grain speckles & longitudinal drag streaks
-    var seed = biome === 'forest' ? 1337 : (biome === 'jungle' ? 4242 : 9001);
-    function rand() {
-      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-      return ((seed >>> 0) / 4294967296);
-    }
 
     for (var i = 0; i < 4500; i++) {
       var x = rand() * w;
@@ -94,8 +172,18 @@ window.GroupBRally = window.GroupBRally || {};
       ctx.fillRect(x, y, sz, sz * (1 + rand() * 1.8));
     }
 
+    if (isIce) {
+      // Crystalline ice glaze streaks
+      for (var ic = 0; ic < 70; ic++) {
+        var ix = w * 0.32 + rand() * w * 0.36;
+        var iy = rand() * h;
+        ctx.fillStyle = 'rgba(224,242,254,' + (0.16 + rand() * 0.22).toFixed(2) + ')';
+        ctx.fillRect(ix, iy, 2 + rand() * 7, 25 + rand() * 75);
+      }
+    }
+
     // Subtle longitudinal tread striations inside ruts
-    ctx.strokeStyle = biome === 'snow' ? 'rgba(110,130,155,0.16)' : 'rgba(40,30,20,0.16)';
+    ctx.strokeStyle = isSnow ? 'rgba(95,122,155,0.20)' : 'rgba(40,30,20,0.16)';
     ctx.lineWidth = 2;
     for (var s = 0; s < 40; s++) {
       var sx = (s % 2 === 0 ? w * 0.31 : w * 0.69) + (rand() - 0.5) * 44;
@@ -120,6 +208,10 @@ window.GroupBRally = window.GroupBRally || {};
       ctx.fillStyle = '#364728';
     } else if (biome === 'jungle') {
       ctx.fillStyle = '#223e1f';
+    } else if (biome === 'tarmac') {
+      ctx.fillStyle = '#475739';
+    } else if (biome === 'wet_tarmac') {
+      ctx.fillStyle = '#323f35';
     } else {
       ctx.fillStyle = '#dce6f2';
     }
@@ -139,6 +231,8 @@ window.GroupBRally = window.GroupBRally || {};
         ctx.fillStyle = rand() > 0.45 ? 'rgba(255,255,255,0.28)' : 'rgba(165,188,212,0.24)';
       } else if (biome === 'jungle') {
         ctx.fillStyle = rand() > 0.5 ? 'rgba(55,105,40,0.32)' : 'rgba(20,38,18,0.35)';
+      } else if (biome === 'tarmac' || biome === 'wet_tarmac') {
+        ctx.fillStyle = rand() > 0.5 ? 'rgba(92,110,82,0.28)' : 'rgba(38,44,36,0.30)';
       } else {
         ctx.fillStyle = rand() > 0.5 ? 'rgba(84,96,52,0.3)' : 'rgba(42,35,24,0.28)';
       }

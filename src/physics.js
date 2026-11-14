@@ -50,7 +50,9 @@ window.GroupBRally = window.GroupBRally || {};
     this.latG = 0;
 
     // Tyre thermal & wear state
-    var ambient = this.track.def.biome === 'snow' ? 18 : (this.track.def.biome === 'jungle' ? 36 : 26);
+    var ambient = this.track.def.biome === 'snow' ? 18
+      : (this.track.def.biome === 'jungle' ? 36
+      : (this.track.def.biome === 'wet_tarmac' ? 16 : 26));
     this.tyreTemp = ambient;
     this.tyreHealth = 1.0;
 
@@ -309,7 +311,9 @@ window.GroupBRally = window.GroupBRally || {};
       : 1.0;
 
     // Tyre temp warms under lateral slip & braking, settles toward ambient
-    var ambientTemp = track.def.biome === 'snow' ? 18 : (track.def.biome === 'jungle' ? 36 : 26);
+    var ambientTemp = track.def.biome === 'snow' ? 18
+      : (track.def.biome === 'jungle' ? 36
+      : (track.def.biome === 'wet_tarmac' ? 16 : 26));
     var heatGen = (this.slipIntensity * 12.0 + (speed / 45) * 2.2) * dt;
     this.tyreTemp += heatGen - (this.tyreTemp - ambientTemp) * 0.03 * dt;
     this.tyreTemp = Math.max(ambientTemp, Math.min(125, this.tyreTemp));
@@ -332,11 +336,11 @@ window.GroupBRally = window.GroupBRally || {};
     }
     this.effectiveGrip = mu;
 
-    // Puddle hydroplane splash trigger
-    if (q.surfaceId === 'puddle' && speed > 14 && this.splashCooldown <= 0 && !this.airborne) {
+    // Puddle hydroplane splash & wet-tarmac mist trigger
+    if ((q.surfaceId === 'puddle' && speed > 14 || q.surfaceId === 'wet_tarmac' && speed > 22) && this.splashCooldown <= 0 && !this.airborne) {
       this.justSplashed = true;
-      this.splashCooldown = 1.8;
-      G.Audio.playSplash();
+      this.splashCooldown = q.surfaceId === 'puddle' ? 1.8 : 3.6;
+      if (q.surfaceId === 'puddle') G.Audio.playSplash();
     }
 
     // Static + Dynamic Longitudinal Weight Transfer onto Front & Rear Axles!
@@ -541,8 +545,8 @@ window.GroupBRally = window.GroupBRally || {};
       }
     }
 
-    // Emit wheel roost/dust/mud/snow spray particles behind rear wheels
-    if (!this.airborne && speed > 6 && (this.slipIntensity > 0.25 || q.surfaceId === 'puddle' || q.surfaceId === 'mud' || q.surfaceId === 'snow')) {
+    // Emit wheel roost/dust/mud/snow/wet-tarmac spray particles behind rear wheels
+    if (!this.airborne && speed > 6 && (this.slipIntensity > 0.25 || q.surfaceId === 'puddle' || q.surfaceId === 'mud' || q.surfaceId === 'snow' || (q.surfaceId === 'wet_tarmac' && speed > 10))) {
       if (Math.random() < 0.65) {
         var rearX = this.pos.x - fwdX * 1.3 + rgtX * ((Math.random() > 0.5 ? 1 : -1) * 0.72);
         var rearZ = this.pos.z - fwdZ * 1.3 + rgtZ * ((Math.random() > 0.5 ? 1 : -1) * 0.72);
