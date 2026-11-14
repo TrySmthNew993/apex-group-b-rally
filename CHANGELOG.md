@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.2] - 2026-11-14
+
+### Changed
+- **Dark Frosted Bento Glass UI (`styles.css`, `mobile.css`)**:
+  - Darker, cleaner bento-grid card spacing (`gap: 12px` / `10px`), rounded `14px`–`16px` tiles, `22px` frosted glass `backdrop-filter: blur(...)`, subtle `1px` specular borders, and deeper radial backdrop vignette across Desktop and Mobile.
+
+---
+
 ## [1.6.1] - 2026-11-14
 
 ### Added

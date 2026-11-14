@@ -1,7 +1,9 @@
 :root {
-  --bg-dark: rgba(11, 14, 19, 0.86);
-  --bg-card: rgba(15, 20, 28, 0.82);
-  --border: rgba(255, 255, 255, 0.14);
+  --bg-dark: rgba(6, 8, 12, 0.72);
+  --bg-card: rgba(9, 12, 18, 0.62);
+  --border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(22px) saturate(135%);
+  --glass-shadow: 0 14px 40px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --text: #f8fafc;
   --muted: #94a3b8;
   --accent-red: #e11d48;
@@ -86,7 +88,7 @@ html, body {
   flex-direction: column;
   justify-content: space-between;
   padding: 16px 24px;
-  background: radial-gradient(circle at 58% 48%, rgba(10,14,20,0.08) 0%, rgba(10,14,20,0.68) 72%, rgba(8,10,14,0.92) 100%);
+  background: radial-gradient(circle at 58% 48%, rgba(4,6,10,0.22) 0%, rgba(4,6,10,0.74) 72%, rgba(3,5,8,0.94) 100%);
   z-index: 10;
 }
 
@@ -1539,4 +1541,56 @@ kbd {
     overflow-y: auto;
     padding: 14px 18px;
   }
+}
+
+/* ==================== DARK FROSTED BENTO GLASS THEME ==================== */
+.menu-topbar,
+.menu-bottombar,
+.card,
+.stage-card,
+.car-card,
+.tyre-card,
+.setting-item,
+.hud-panel,
+.hud-pacenote,
+.hud-telemetry,
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.menu-body,
+.settings-grid,
+.stage-grid,
+.car-grid,
+.tyre-grid {
+  gap: 12px;
+}
+
+.stage-card,
+.car-card,
+.tyre-card,
+.setting-item {
+  border-radius: 14px;
+  background: rgba(10, 14, 21, 0.56);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.stage-card:hover,
+.car-card:hover,
+.tyre-card:hover {
+  background: rgba(16, 22, 32, 0.72);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.stage-card.selected,
+.car-card.selected,
+.tyre-card.selected {
+  background: rgba(18, 26, 38, 0.82);
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25), var(--glass-shadow);
 }

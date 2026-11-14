@@ -1,7 +1,9 @@
 :root {
-  --bg-dark: rgba(11, 14, 19, 0.90);
-  --bg-card: rgba(15, 20, 28, 0.88);
-  --border: rgba(255, 255, 255, 0.16);
+  --bg-dark: rgba(6, 8, 12, 0.74);
+  --bg-card: rgba(9, 12, 18, 0.64);
+  --border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(20px) saturate(135%);
+  --glass-shadow: 0 12px 32px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --text: #f8fafc;
   --muted: #94a3b8;
   --accent-red: #e11d48;
@@ -767,3 +769,30 @@ button, select, input {
 }
 .finish-stats-grid span { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
 .finish-stats-grid strong { font-family: var(--font-mono); font-size: 12px; }
+
+/* ==================== DARK FROSTED BENTO GLASS THEME ==================== */
+.m-topbar,
+.m-bottombar,
+.m-card,
+.m-setting-row,
+.m-radio,
+.hud-pill,
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.m-grid,
+.m-settings-list {
+  gap: 10px;
+}
+
+.m-card,
+.m-setting-row {
+  border-radius: 14px;
+  background: rgba(10, 14, 21, 0.58);
+}
