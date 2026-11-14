@@ -168,13 +168,13 @@ window.GroupBRally = window.GroupBRally || {};
       : 1.0 / (1.0 + (speed / 36.0) * (speed / 36.0));
     var maxSteer = car.maxSteerAngle * ((isArcade ? 0.58 : 0.36) + (isArcade ? 0.42 : 0.64) * speedSteerLimit);
 
-    // Automatic countersteer assist (strongest in Arcade, off in Pure Sim)
+    // Automatic countersteer assist (medium/low only; arcade tracks cleanly without fighting the wheel)
     var counterAssist = 0;
-    if (assistMode !== 'off' && speed > 5) {
+    if (!isArcade && assistMode !== 'off' && speed > 5) {
       var slipDir = Math.atan2(vRgt, Math.max(2, Math.abs(vFwd)));
-      var assistWeight = isArcade ? 0.80 : (assistMode === 'medium' ? 0.48 : 0.22);
-      var assistCap = isArcade ? 0.38 : 0.22;
-      counterAssist = Math.max(-assistCap, Math.min(assistCap, slipDir * assistWeight));
+      var assistWeight = assistMode === 'medium' ? 0.38 : 0.18;
+      var assistCap = 0.22;
+      counterAssist = Math.max(-assistCap, Math.min(assistCap, -slipDir * assistWeight));
     }
 
     var desiredSteer = input.steer * maxSteer * sens + counterAssist;
@@ -466,11 +466,12 @@ window.GroupBRally = window.GroupBRally || {};
       this.vel.z = newVFwd * fwdZ + newVRgt * rgtZ;
 
       this.yawRate += (tauYaw / Iz) * dt;
-      if (isArcade && speed > 2) {
-        // Direct arcade cornering blend: car turns crisply with steering input
-        var arcadeYawTarget = -input.steer * sens * Math.min(2.3, 0.9 + speed * 0.045) * (vFwd >= 0 ? 1 : -1);
+      if (isArcade && speed > 1.5) {
+        // Direct arcade cornering tied to steerAngle: +steerAngle (LEFT) -> +yawRate (LEFT)
+        var steerNorm = this.steerAngle / Math.max(0.01, car.maxSteerAngle);
+        var arcadeYawTarget = steerNorm * Math.min(2.4, 0.95 + speed * 0.045) * (vFwd >= 0 ? 1 : -1);
         if (this.handbrake) arcadeYawTarget *= 1.35;
-        this.yawRate += (arcadeYawTarget - this.yawRate) * Math.min(1, dt * 8.5);
+        this.yawRate += (arcadeYawTarget - this.yawRate) * Math.min(1, dt * 10.0);
       }
       var maxYaw = isArcade ? 2.6 : 3.2;
       this.yawRate = Math.max(-maxYaw, Math.min(maxYaw, this.yawRate));
