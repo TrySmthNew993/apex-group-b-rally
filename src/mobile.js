@@ -18,6 +18,7 @@ window.GroupBRally = window.GroupBRally || {};
     transmission: 'auto',
     steerSens: 1.0,
     quality: 'medium',
+    weather: 'auto',
     units: 'kmh',
     voiceEnabled: true,
     masterVol: 0.75,
@@ -165,6 +166,7 @@ window.GroupBRally = window.GroupBRally || {};
     var elTrans = document.getElementById('m-trans');
     var elSens = document.getElementById('m-steer-sens');
     var elQuality = document.getElementById('m-quality');
+    var elWeather = document.getElementById('m-weather');
     var elUnits = document.getElementById('m-units');
     var elVoice = document.getElementById('m-voice');
 
@@ -174,6 +176,7 @@ window.GroupBRally = window.GroupBRally || {};
     elTrans.value = settings.transmission;
     elSens.value = settings.steerSens;
     elQuality.value = settings.quality;
+    elWeather.value = settings.weather || 'auto';
     elUnits.value = settings.units;
     elVoice.checked = !!settings.voiceEnabled;
     document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
@@ -186,6 +189,7 @@ window.GroupBRally = window.GroupBRally || {};
       settings.transmission = elTrans.value;
       settings.steerSens = parseFloat(elSens.value);
       settings.quality = elQuality.value;
+      settings.weather = elWeather.value;
       settings.units = elUnits.value;
       settings.voiceEnabled = elVoice.checked;
       document.getElementById('m-val-sens').textContent = Number(settings.steerSens).toFixed(2);
@@ -199,7 +203,7 @@ window.GroupBRally = window.GroupBRally || {};
       G.saveJSON(STORAGE_SETTINGS, settings);
     }
 
-    [elControlMode, elSteerMode, elAssists, elTrans, elSens, elQuality, elUnits, elVoice].forEach(function (el) {
+    [elControlMode, elSteerMode, elAssists, elTrans, elSens, elQuality, elWeather, elUnits, elVoice].forEach(function (el) {
       el.addEventListener('change', update);
       el.addEventListener('input', update);
     });

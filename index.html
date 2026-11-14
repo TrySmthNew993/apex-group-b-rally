@@ -166,6 +166,17 @@
                 <option value="low">LOW — MAXIMUM PERFORMANCE</option>
               </select>
             </div>
+            <div class="setting-item">
+              <label for="set-weather">STAGE WEATHER</label>
+              <select id="set-weather">
+                <option value="auto" selected>STAGE DEFAULT (AUTO)</option>
+                <option value="clear">CLEAR SKY (0% GRIP PENALTY)</option>
+                <option value="overcast">OVERCAST (-2% GRIP)</option>
+                <option value="rain">RAIN (-6% GRIP)</option>
+                <option value="snow">SNOWFALL (-8% GRIP)</option>
+                <option value="storm">HEAVY STORM (-10% GRIP)</option>
+              </select>
+            </div>
 
             <div class="setting-item">
               <label for="set-master-vol">MASTER VOLUME (<span id="val-master-vol">75</span>%)</label>
@@ -349,14 +360,14 @@
 
   <!-- Scripts loaded in dependency order (works cleanly on both http:// and file://) -->
   <script src="vendor/three.min.js"></script>
-  <script src="src/data.js?v=4"></script>
+  <script src="src/data.js?v=7"></script>
   <script src="src/textures.js?v=4"></script>
   <script src="src/audio.js?v=4"></script>
-  <script src="src/tracks.js?v=4"></script>
-  <script src="src/carVisuals.js?v=5"></script>
-  <script src="src/physics.js?v=4"></script>
+  <script src="src/tracks.js?v=7"></script>
+  <script src="src/carVisuals.js?v=7"></script>
+  <script src="src/physics.js?v=7"></script>
   <script src="src/reshade.js?v=4"></script>
-  <script src="src/core.js?v=6"></script>
-  <script src="src/main.js?v=6"></script>
+  <script src="src/core.js?v=7"></script>
+  <script src="src/main.js?v=7"></script>
 </body>
 </html>

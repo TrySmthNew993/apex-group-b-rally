@@ -10,6 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.0] - 2026-11-14
+
+### Added
+- **Dynamic Weather System & Surface-Dependent Grip Modifiers (`src/data.js`, `src/physics.js`, `src/tracks.js`, `src/carVisuals.js`, `src/core.js`)**:
+  - Added selectable weather conditions (`AUTO` stage default, `CLEAR SKY`, `OVERCAST`, `RAIN`, `SNOWFALL`, `HEAVY STORM`) in both Desktop (`#set-weather`) and Mobile (`#m-weather`) settings.
+  - Primary tire traction remains governed by the active road surface (`tarmac`, `wet_tarmac`, `gravel`, `mud`, `snow`, `ice`), reduced by a small weather-specific percentage (`0%` Clear, `-2%` Overcast, `-6%` Rain, `-8%` Snowfall, `-10%` Heavy Storm) plus ambient tyre-temperature shifts.
+  - Modulated 3D stage fog density, directional sun intensity, precipitation particle count/fall-speed/wind-drift, and continuous windshield raindrop accumulation cleared by the cockpit wipers.
+
+---
+
 ## [1.5.0] - 2026-11-14
 
 ### Added

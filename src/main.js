@@ -19,6 +19,7 @@ window.GroupBRally = window.GroupBRally || {};
     fov: 68,
     units: 'kmh',
     quality: 'high',
+    weather: 'auto',
     masterVol: 0.75,
     engineVol: 0.80,
     sfxVol: 0.85,
@@ -174,6 +175,7 @@ window.GroupBRally = window.GroupBRally || {};
     var elFov = document.getElementById('set-fov');
     var elUnits = document.getElementById('set-units');
     var elQuality = document.getElementById('set-quality');
+    var elWeather = document.getElementById('set-weather');
     var elMaster = document.getElementById('set-master-vol');
     var elEngine = document.getElementById('set-engine-vol');
     var elSfx = document.getElementById('set-sfx-vol');
@@ -186,6 +188,7 @@ window.GroupBRally = window.GroupBRally || {};
     elFov.value = settings.fov;
     elUnits.value = settings.units;
     elQuality.value = settings.quality;
+    elWeather.value = settings.weather || 'auto';
     elMaster.value = settings.masterVol;
     elEngine.value = settings.engineVol;
     elSfx.value = settings.sfxVol;
@@ -209,6 +212,7 @@ window.GroupBRally = window.GroupBRally || {};
       settings.fov = parseInt(elFov.value, 10);
       settings.units = elUnits.value;
       settings.quality = elQuality.value;
+      settings.weather = elWeather.value;
       settings.masterVol = parseFloat(elMaster.value);
       settings.engineVol = parseFloat(elEngine.value);
       settings.sfxVol = parseFloat(elSfx.value);
@@ -227,7 +231,7 @@ window.GroupBRally = window.GroupBRally || {};
       syncLabels();
     }
 
-    [elControlMode, elAssists, elTrans, elSteer, elFov, elUnits, elQuality, elMaster, elEngine, elSfx, elVoice].forEach(function (el) {
+    [elControlMode, elAssists, elTrans, elSteer, elFov, elUnits, elQuality, elWeather, elMaster, elEngine, elSfx, elVoice].forEach(function (el) {
       el.addEventListener('change', onChange);
       el.addEventListener('input', onChange);
     });

@@ -352,6 +352,7 @@ window.GroupBRally = window.GroupBRally || {};
     var trackDef = G.getTrack(trackId);
     var carDef = G.getCar(carId);
     var tyreDef = G.getTyre(tyreId);
+    var weatherDef = G.getWeather ? G.getWeather(settings.weather, trackDef) : null;
     var isHigh = settings.quality === 'high';
 
     G.Audio.setCarProfile(carDef);
@@ -360,7 +361,7 @@ window.GroupBRally = window.GroupBRally || {};
 
     this.raceScene = new THREE.Scene();
     this.raceScene.background = new THREE.Color(trackDef.skyHorizon);
-    this.raceScene.fog = new THREE.FogExp2(trackDef.fogColor, trackDef.fogDensity);
+    this.raceScene.fog = new THREE.FogExp2(trackDef.fogColor, trackDef.fogDensity * (weatherDef ? weatherDef.fogMult : 1));
 
     this.skyMesh = G.createSkyDomeMesh
       ? G.createSkyDomeMesh(trackDef, this.sunOffset, isHigh)
@@ -381,7 +382,8 @@ window.GroupBRally = window.GroupBRally || {};
 
     this.raceScene.add(new THREE.HemisphereLight(trackDef.skyTop, trackDef.ambientColor, isHigh ? 0.92 : 0.78));
 
-    this.sunLight = new THREE.DirectionalLight(trackDef.sunColor, isHigh ? trackDef.sunIntensity * 1.15 : trackDef.sunIntensity);
+    var sunMult = weatherDef ? weatherDef.sunMult : 1;
+    this.sunLight = new THREE.DirectionalLight(trackDef.sunColor, (isHigh ? trackDef.sunIntensity * 1.15 : trackDef.sunIntensity) * sunMult);
     this.sunLight.position.copy(this.sunOffset);
     if (settings.quality !== 'low') {
       this.sunLight.castShadow = true;
@@ -407,7 +409,7 @@ window.GroupBRally = window.GroupBRally || {};
       this.raceScene.add(bounceLight);
     }
 
-    this.activeTrack = new G.TrackInstance(trackDef, settings.quality).build();
+    this.activeTrack = new G.TrackInstance(trackDef, settings.quality, weatherDef).build();
     this.raceScene.add(this.activeTrack.group);
 
     this.carPivot = new THREE.Group();

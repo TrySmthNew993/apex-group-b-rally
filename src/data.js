@@ -883,6 +883,86 @@ window.GroupBRally = window.GroupBRally || {};
     }
   ];
 
+  G.WEATHER = [
+    {
+      id: 'clear',
+      name: 'CLEAR SKY',
+      gripPenalty: 0.0,
+      fogMult: 0.85,
+      sunMult: 1.08,
+      ambientTempOffset: 3,
+      particleType: 'clear',
+      particleCount: 120,
+      fallSpeed: 0.7,
+      drift: 0.3,
+      rainDropletsRate: 0
+    },
+    {
+      id: 'overcast',
+      name: 'OVERCAST',
+      gripPenalty: 0.02,
+      fogMult: 1.15,
+      sunMult: 0.82,
+      ambientTempOffset: -2,
+      particleType: 'overcast',
+      particleCount: 180,
+      fallSpeed: 0.9,
+      drift: 0.45,
+      rainDropletsRate: 0
+    },
+    {
+      id: 'rain',
+      name: 'RAIN',
+      gripPenalty: 0.06,
+      fogMult: 1.38,
+      sunMult: 0.68,
+      ambientTempOffset: -5,
+      particleType: 'rain',
+      particleCount: 560,
+      fallSpeed: 12.5,
+      drift: 0.6,
+      rainDropletsRate: 6.5
+    },
+    {
+      id: 'storm',
+      name: 'HEAVY STORM',
+      gripPenalty: 0.10,
+      fogMult: 1.68,
+      sunMult: 0.50,
+      ambientTempOffset: -7,
+      particleType: 'storm',
+      particleCount: 820,
+      fallSpeed: 16.5,
+      drift: 2.2,
+      rainDropletsRate: 13.0
+    },
+    {
+      id: 'snow',
+      name: 'SNOWFALL',
+      gripPenalty: 0.08,
+      fogMult: 1.45,
+      sunMult: 0.76,
+      ambientTempOffset: -10,
+      particleType: 'snow',
+      particleCount: 700,
+      fallSpeed: 4.8,
+      drift: 1.8,
+      rainDropletsRate: 1.2
+    }
+  ];
+
+  G.getWeather = function (id, trackDef) {
+    var resolvedId = id;
+    if (!resolvedId || resolvedId === 'auto') {
+      var wt = trackDef && trackDef.weatherType;
+      if (wt === 'snowfall') resolvedId = 'snow';
+      else if (wt === 'mist_rain') resolvedId = 'rain';
+      else if (wt === 'clear') resolvedId = 'clear';
+      else resolvedId = 'overcast';
+    }
+    return G.WEATHER.find(function (w) { return w.id === resolvedId; }) || G.WEATHER[0];
+  };
+
   G.getCar = function (id) {
     return G.CARS.find(function (c) { return c.id === id; }) || G.CARS[0];
   };

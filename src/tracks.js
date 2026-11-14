@@ -8,9 +8,10 @@ window.GroupBRally = window.GroupBRally || {};
 
   var UP = new THREE.Vector3(0, 1, 0);
 
-  function TrackInstance(trackDef, quality) {
+  function TrackInstance(trackDef, quality, weatherDef) {
     this.def = trackDef;
     this.quality = quality || 'high';
+    this.weather = weatherDef || (G.getWeather ? G.getWeather('auto', trackDef) : null);
     this.group = new THREE.Group();
     this.samples = [];
     this.totalLength = 0;
@@ -910,7 +911,9 @@ window.GroupBRally = window.GroupBRally || {};
    */
   TrackInstance.prototype.buildWeatherAndSpray = function () {
     var def = this.def;
-    var count = def.weatherType === 'snowfall' ? 700 : (def.weatherType === 'mist_rain' ? 520 : (def.weatherType === 'clear' ? 120 : 320));
+    var w = this.weather;
+    var pType = w ? w.particleType : (def.weatherType === 'snowfall' ? 'snow' : (def.weatherType === 'mist_rain' ? 'rain' : (def.weatherType === 'clear' ? 'clear' : 'overcast')));
+    var count = w ? w.particleCount : (pType === 'snow' ? 700 : (pType === 'rain' ? 520 : (pType === 'clear' ? 120 : 320)));
     var positions = new Float32Array(count * 3);
     for (var i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * 44;
@@ -919,11 +922,14 @@ window.GroupBRally = window.GroupBRally || {};
     }
     var geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    var pColor = pType === 'snow' ? 0xffffff : ((pType === 'rain' || pType === 'storm') ? 0xdbeafe : (pType === 'overcast' ? 0xd8dee6 : 0xf5e8c8));
+    var pSize = pType === 'snow' ? 0.16 : (pType === 'storm' ? 0.13 : (pType === 'rain' ? 0.11 : 0.08));
+    var pOpacity = pType === 'snow' ? 0.82 : (pType === 'storm' ? 0.68 : (pType === 'rain' ? 0.52 : (pType === 'overcast' ? 0.28 : 0.14)));
     var mat = new THREE.PointsMaterial({
-      color: def.weatherType === 'snowfall' ? 0xffffff : (def.weatherType === 'mist_rain' ? 0xdbeafe : 0xf5e8c8),
-      size: def.weatherType === 'snowfall' ? 0.16 : (def.weatherType === 'mist_rain' ? 0.11 : 0.08),
+      color: pColor,
+      size: pSize,
       transparent: true,
-      opacity: def.weatherType === 'snowfall' ? 0.82 : (def.weatherType === 'mist_rain' ? 0.52 : (def.weatherType === 'clear' ? 0.14 : 0.38))
+      opacity: pOpacity
     });
     this.weatherSystem = new THREE.Points(geom, mat);
     this.group.add(this.weatherSystem);
@@ -976,10 +982,12 @@ window.GroupBRally = window.GroupBRally || {};
       this.weatherSystem.position.set(carPos.x, carPos.y, carPos.z);
       var posAttr = this.weatherSystem.geometry.attributes.position;
       var arr = posAttr.array;
-      var fallSpeed = this.def.weatherType === 'snowfall' ? 4.8 : (this.def.weatherType === 'mist_rain' ? 11.0 : 0.7);
-      var drift = this.def.weatherType === 'snowfall' ? 1.8 : 0.3;
+      var w = this.weather;
+      var fallSpeed = w ? w.fallSpeed : (this.def.weatherType === 'snowfall' ? 4.8 : (this.def.weatherType === 'mist_rain' ? 11.0 : 0.7));
+      var drift = w ? w.drift : (this.def.weatherType === 'snowfall' ? 1.8 : 0.3);
+      var isStorm = w && w.particleType === 'storm';
       for (var i = 0; i < arr.length; i += 3) {
-        arr[i] += Math.sin(arr[i + 1] + i) * drift * dt;
+        arr[i] += (isStorm ? drift : Math.sin(arr[i + 1] + i) * drift) * dt;
         arr[i + 1] -= fallSpeed * dt;
         if (arr[i + 1] < -1.5) {
           arr[i + 1] = 16.5;

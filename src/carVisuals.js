@@ -1160,6 +1160,20 @@ window.GroupBRally = window.GroupBRally || {};
     }
 
     // 3. Windshield droplets & wipers
+    var track = cs.trackInstance;
+    var rainRate = (track && track.weather && track.weather.rainDropletsRate) ? track.weather.rainDropletsRate : 0;
+    if (rainRate > 0 && cs.droplets.length < 60) {
+      cs.rainAccum = (cs.rainAccum || 0) + rainRate * dt;
+      while (cs.rainAccum >= 1 && cs.droplets.length < 60) {
+        cs.rainAccum -= 1;
+        cs.droplets.push({
+          x: Math.random() * 512,
+          y: Math.random() * 256,
+          r: 2.5 + Math.random() * 4.5,
+          col: track.weather.particleType === 'snow' ? 'rgba(240,248,255,0.65)' : 'rgba(205,236,255,0.65)'
+        });
+      }
+    }
     if (physState.justSplashed) {
       cs.wiperActiveTimer = 2.6;
       for (var d = 0; d < 28; d++) {

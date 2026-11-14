@@ -16,6 +16,7 @@ window.GroupBRally = window.GroupBRally || {};
     this.tyre = tyreDef;
     this.track = trackInstance;
     this.settings = settings || {};
+    this.weather = trackInstance.weather || (G.getWeather ? G.getWeather(this.settings.weather, trackInstance.def) : null);
 
     this.reset();
   }
@@ -314,6 +315,9 @@ window.GroupBRally = window.GroupBRally || {};
     var ambientTemp = track.def.biome === 'snow' ? 18
       : (track.def.biome === 'jungle' ? 36
       : (track.def.biome === 'wet_tarmac' ? 16 : 26));
+    if (this.weather && this.weather.ambientTempOffset) {
+      ambientTemp = Math.max(4, ambientTemp + this.weather.ambientTempOffset);
+    }
     var heatGen = (this.slipIntensity * 12.0 + (speed / 45) * 2.2) * dt;
     this.tyreTemp += heatGen - (this.tyreTemp - ambientTemp) * 0.03 * dt;
     this.tyreTemp = Math.max(ambientTemp, Math.min(125, this.tyreTemp));
@@ -325,12 +329,13 @@ window.GroupBRally = window.GroupBRally || {};
     var tempDiff = Math.abs(this.tyreTemp - tyre.optimalTemp);
     var tempMod = Math.max(0.88, 1.03 - tempDiff * 0.0022);
     var wearMod = 0.72 + 0.28 * this.tyreHealth;
+    var weatherMult = 1.0 - (this.weather ? (this.weather.gripPenalty || 0) : 0);
 
-    var mu = surf.baseGrip * tyreGripMult * offRoadFactor * tempMod * wearMod;
+    var mu = surf.baseGrip * tyreGripMult * offRoadFactor * tempMod * wearMod * weatherMult;
     if (isArcade) {
-      mu = Math.max(1.55, mu * 1.85);
+      mu = Math.max(1.55 * weatherMult, mu * 1.85);
     } else if (assistMode === 'medium') {
-      mu = Math.max(1.10, mu * 1.35);
+      mu = Math.max(1.10 * weatherMult, mu * 1.35);
     } else if (assistMode === 'low') {
       mu *= 1.15;
     }

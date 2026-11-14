@@ -175,4 +175,17 @@ Full 3D interior driver cockpit rig with animated elements and zero HUD dependen
 - **`src/carVisuals.js`**: Detailed 3D exterior car models and interactive 1st-person cockpit rigs.
 - **`src/physics.js`**: Vehicle dynamics, suspension, tire traction, and drivetrain simulations.
 - **`src/audio.js`**: Real-time Web Audio synthesis.
-- **`src/data.js`**: Vehicle definitions, tire compounds, surface friction matrix, and stage waypoints.
+- **`src/data.js`**: Vehicle definitions, tire compounds, surface friction matrix, weather presets, and stage waypoints.
+
+---
+
+## 8. Dynamic Weather System
+
+- **Selectable & Stage-Default Presets (`G.WEATHER`)**:
+  - `auto` (resolves from stage biome), `clear` (`0%` grip penalty), `overcast` (`-2%`), `rain` (`-6%`), `snow` (`-8%`), and `storm` (`-10%`).
+- **Surface-Primary Grip Integration**:
+  - Road surface remains the primary driver of traction (`surf.baseGrip * tyreGripMult * offRoadFactor * tempMod * wearMod`), scaled by `1 - weather.gripPenalty` (including assist floor scaling so weather differences remain tangible in all assist modes) and ambient temperature offsets.
+- **Atmospheric & Cockpit Effects**:
+  - Dynamic precipitation particle density, fall velocity, and storm wind drift.
+  - Stage fog density and sun intensity modulation.
+  - Continuous windshield droplet accumulation during rain, storm, and snow conditions, cleared interactively by the cockpit wipers.
