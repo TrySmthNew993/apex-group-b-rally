@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.3] - 2026-11-19
+
+### Fixed
+- **Mobile & Touch On-Track Controls (`src/mobile.js`, `src/main.js`)**:
+  - Fixed a reference-reassignment bug in `startStage()` where `touchState = { ... }` replaced the object bound by `G.bindTouchPad(...)`, causing on-screen steering, gas, brake, and handbrake touch pads to stop responding once a stage started. Now mutates `touchState` properties in place and clears stale `.pressed` states.
+
+---
+
 ## [1.6.2] - 2026-11-14
 
 ### Changed

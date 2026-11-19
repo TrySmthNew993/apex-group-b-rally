@@ -370,7 +370,12 @@ window.GroupBRally = window.GroupBRally || {};
 
     applyControlModeUI();
     glanceToggle = false;
-    touchState = { left: false, right: false, gas: false, brake: false, hb: false };
+    touchState.left = false;
+    touchState.right = false;
+    touchState.gas = false;
+    touchState.brake = false;
+    touchState.hb = false;
+    document.querySelectorAll('.t-touch-btn.pressed').forEach(function (el) { el.classList.remove('pressed'); });
     document.getElementById('t-btn-glance').classList.remove('active');
     document.getElementById('t-btn-lights').classList.toggle('active', engine.cockpitState.lightsOn);
     document.getElementById('main-menu').classList.add('hidden');

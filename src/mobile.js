@@ -368,7 +368,12 @@ window.GroupBRally = window.GroupBRally || {};
     var trackDef = G.getTrack(selectedTrackId);
     sectorToastTimer = 0;
     glanceToggle = false;
-    touchState = { left: false, right: false, gas: false, brake: false, hb: false };
+    touchState.left = false;
+    touchState.right = false;
+    touchState.gas = false;
+    touchState.brake = false;
+    touchState.hb = false;
+    document.querySelectorAll('.touch-btn.pressed').forEach(function (el) { el.classList.remove('pressed'); });
 
     engine.startStage(selectedTrackId, selectedCarId, selectedTyreId, settings, getAdaptiveFov(), stageCallbacks);
 
